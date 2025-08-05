@@ -1,0 +1,119 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Manual Payment Confirmation</title>
+    <link href="https://cdn.jsdelivr.net/npm/bootstrap@5.3.0/dist/css/bootstrap.min.css" rel="stylesheet">
+</head>
+<body class="bg-light d-flex justify-content-center align-items-center vh-100">
+    <div class="card p-4 shadow-lg" style="width: 400px;">
+        <h4 class="text-center mb-3">Confirm Bank Transfer</h4>
+        <form id="confirmForm">
+            <div class="mb-3">
+                <label>Email of Camper</label>
+                <input type="email" name="email" class="form-control" required>
+            </div>
+            <div class="mb-3">
+                <label>Reference (Optional)</label>
+                <input type="text" name="reference" class="form-control">
+            </div>
+            <button type="submit" class="btn btn-success w-100">Confirm Payment</button>
+        </form>
+        <div id="responseMsg" class="alert mt-3 d-none"></div>
+    </div>
+    <!-- Loading Popup -->
+<div id="admin-loading-popup" style="
+display: none; 
+position: fixed; 
+top: 0; left: 0; 
+width: 100%; height: 100%;
+background: rgba(0,0,0,0.5);
+z-index: 9999;
+backdrop-filter: blur(3px);
+text-align: center;
+padding-top: 20%;
+">
+<div style="
+    background: #fff; 
+    display: inline-block; 
+    padding: 30px 50px; 
+    border-radius: 10px;
+    font-size: 18px;
+    color: #333;
+    box-shadow: 0 0 15px rgba(0,0,0,0.3);
+">
+    <p>Confirming payment...<br>Please wait.</p>
+    <div class="spinner" style="
+        margin: 20px auto; 
+        width: 40px; 
+        height: 40px; 
+        border: 5px solid #ccc; 
+        border-top: 5px solid #2196F3; 
+        border-radius: 50%; 
+        animation: spin 1s linear infinite;">
+    </div>
+</div>
+</div>
+
+<style>
+@keyframes spin {
+from { transform: rotate(0deg); }
+to { transform: rotate(360deg); }
+}
+</style>
+
+<div id="admin-success-popup" style="
+    display: none;
+    position: fixed;
+    top: 0; left: 0;
+    width: 100%; height: 100%;
+    background: rgba(0,0,0,0.4);
+    z-index: 10000;
+    text-align: center;
+    padding-top: 20%;
+">
+    <div style="
+        background: #fff;
+        display: inline-block;
+        padding: 30px 50px;
+        border-radius: 10px;
+        font-size: 18px;
+        color: #333;
+        box-shadow: 0 0 15px rgba(0,0,0,0.3);
+    ">
+        <h3 style="color: #4CAF50;">✅ Payment Confirmed!</h3>
+        <p>Kindly check your mail for your payment receipt.</p>
+    </div>
+</div>
+
+
+<script>    
+
+document.getElementById("confirmForm").addEventListener('submit', async function (e) {
+    e.preventDefault();
+    document.getElementById('admin-loading-popup').style.display = 'block';
+
+    const formData = new FormData(this);
+    const response = await fetch('/admin/confirm-payment', {
+        method: 'POST',
+        body: formData
+    });
+    
+    const result = await response.json();
+    document.getElementById('admin-loading-popup').style.display = 'none';
+
+    if (response.ok) {
+        document.getElementById('admin-success-popup').style.display = 'block';
+        setTimeout(() => {
+            document.getElementById('admin-success-popup').style.display = 'none';
+            location.reload();
+        }, 2000);
+    } else {
+        alert(result.message);
+    }
+
+});
+</script>
+</body>
+</html>
