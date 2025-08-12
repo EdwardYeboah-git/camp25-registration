@@ -3,214 +3,132 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>Youth Camp 2025 Registration</title>
+    <title>Youth Camp 2025 - Registration</title>
     <link href="https://cdn.jsdelivr.net/npm/bootstrap@5.3.0/dist/css/bootstrap.min.css" rel="stylesheet">
     <style>
         body {
             background: url('images/YouthCamp.png') no-repeat center center/cover;
             min-height: 100vh;
             margin: 0;
-            display: flex;
-            justify-content: center;
-            align-items: center;
             font-family: 'Segoe UI', sans-serif;
-            position: relative;
         }
-        body::before {
-            content: "";
-            position: absolute;
-            top: 0;
-            left: 0;
-            width: 100%;
-            height: 100%;
-            background: rgba(0, 0, 0, 0.5);
-            z-index: 0;
-        }
-        .card {
-            position: relative;
-            z-index: 1;
-            border: none;
-            border-radius: 15px;
+        .form-card {
             background: rgba(255, 255, 255, 0.95);
+            border-radius: 15px;
             padding: 25px;
-            width: 100%;
-            max-width: 520px;
+            max-width: 600px;
+            margin: auto;
+            margin-top: 50px;
             box-shadow: 0 4px 15px rgba(0,0,0,0.2);
         }
-        .logo {
-            display: block;
-            margin: 0 auto 15px;
-            width: 80px;
-            height: auto;
+        #loading-popup, #success-popup {
+            position: fixed;
+            top: 0; left: 0; width: 100%; height: 100%;
+            background: rgba(0,0,0,0.5);
+            display: none;
+            justify-content: center;
+            align-items: center;
+            z-index: 9999;
+            color: white;
+            font-size: 1.5rem;
+            text-align: center;
         }
-        h2 {
-            color: #2575fc;
-            font-weight: bold;
-        }
-        .btn-primary {
-            background-color: #2575fc;
-            border: none;
-        }
-        .btn-primary:hover {
-            background-color: #1b5fc6;
-        }
-        /* Progress bar */
-        .progress-container {
-            margin-bottom: 20px;
-        }
-        .progress-bar {
-            background-color: #2575fc;
+        #success-popup {
+            background: rgba(0, 128, 0, 0.8);
         }
     </style>
 </head>
 <body>
-    <div class="card shadow-lg">
-        <img src="images/church-logo.png" alt="Church Logo" class="logo">
-        <h2 class="text-center mb-4">REPLIB Youth Camp 2025 Registration</h2>
-        <p class="text-center text-muted">Kindly register to join us for an unforgettable camp experience!</p>
-        
-        <!-- Progress Bar -->
-        <div class="progress-container">
-            <div class="progress" style="height: 20px;">
-                <div class="progress-bar" role="progressbar" style="width: 50%;" aria-valuenow="50" aria-valuemin="0" aria-valuemax="100">
-                    Step 1 of 2: Registration
-                </div>
-            </div>
+
+<div class="form-card">
+    <h2 class="text-center mb-4">REPLIB Youth Camp 2025 Registration</h2>
+    <form id="registrationForm">
+        <div class="mb-3">
+            <label for="fullname" class="form-label">Full Name</label>
+            <input type="text" class="form-control" name="fullname" id="fullname" required>
         </div>
-
-        <form id="registrationForm">
-            <div class="mb-3">
-                <label class="form-label">Full Name</label>
-                <input type="text" name="fullname" class="form-control" placeholder="Enter your full name" required>
-            </div>
-            <div class="mb-3">
-                <label class="form-label">Age</label>
-                <input type="number" name="age" class="form-control" placeholder="Your age" required>
-            </div>
-            <div class="mb-3">
-                <label class="form-label">Gender</label>
-                <select name="gender" class="form-select" required>
-                    <option value="">Select Gender</option>
-                    <option value="Male">Male</option>
-                    <option value="Female">Female</option>
-                </select>
-            </div>
-            <div class="mb-3">
-                <label class="form-label">Church / Assembly</label>
-                <input type="text" name="church" class="form-control" placeholder="Your church or assembly" required>
-            </div>
-            <div class="mb-3">
-                <label class="form-label">Phone Number</label>
-                <input type="text" name="phone" class="form-control" placeholder="e.g., 024xxxxxxx" required>
-            </div>
-            <div class="mb-3">
-                <label class="form-label">Email Address</label>
-                <input type="email" name="email" class="form-control" placeholder="you@example.com" required>
-            </div>
-            <div class="mb-3">
-    <label class="form-label">Pass Type</label>
-    <select name="passType" class="form-select" required>
-        <option value="">Select Pass</option>
-        <option value="General Pass">General Pass - GH₵ 999</option>
-        <option value="Team Pass">Team Pass - GH₵ 4500</option>
-    </select>
-    </div>
-            <button type="submit" class="btn btn-primary w-100 py-2">Continue to Payment</button>
-        </form>
-        <div id="responseMessage" class="alert mt-3 d-none"></div>
-        
-    </div>
-    <!-- Loading Popup -->
-<div id="loading-popup" style="
-display: none; 
-position: fixed; 
-top: 0; left: 0; 
-width: 100%; height: 100%;
-background: rgba(0,0,0,0.5);
-z-index: 9999;
-backdrop-filter: blur(3px);
-text-align: center;
-padding-top: 20%;
-">
-<div style="
-    background: #fff; 
-    display: inline-block; 
-    padding: 30px 50px; 
-    border-radius: 10px;
-    font-size: 18px;
-    color: #333;
-    box-shadow: 0 0 15px rgba(0,0,0,0.3);
-">
-    <p>Processing your registration...<br>Please wait.</p>
-    <div class="spinner" style="
-        margin: 20px auto; 
-        width: 40px; 
-        height: 40px; 
-        border: 5px solid #ccc; 
-        border-top: 5px solid #4CAF50; 
-        border-radius: 50%; 
-        animation: spin 1s linear infinite;">
-    </div>
-</div>
+        <div class="mb-3">
+            <label for="age" class="form-label">Age</label>
+            <input type="number" class="form-control" name="age" id="age" required>
+        </div>
+        <div class="mb-3">
+            <label for="gender" class="form-label">Gender</label>
+            <select class="form-select" name="gender" id="gender" required>
+                <option value="">Select...</option>
+                <option>Male</option>
+                <option>Female</option>
+            </select>
+        </div>
+        <div class="mb-3">
+            <label for="church" class="form-label">Church</label>
+            <input type="text" class="form-control" name="church" id="church">
+        </div>
+        <div class="mb-3">
+            <label for="phone" class="form-label">Phone</label>
+            <input type="tel" class="form-control" name="phone" id="phone" required>
+        </div>
+        <div class="mb-3">
+            <label for="email" class="form-label">Email Address</label>
+            <input type="email" class="form-control" name="email" id="email" required>
+        </div>
+        <div class="mb-3">
+            <label for="passType" class="form-label">Pass Type</label>
+            <select class="form-select" name="passType" id="passType" required>
+                <option value="">Select Pass</option>
+                <option value="general">General Pass - GHS 999</option>
+                <option value="team">Team Pass - GHS 4500</option>
+            </select>
+        </div>
+        <button type="submit" class="btn btn-primary w-100">Register</button>
+    </form>
 </div>
 
-<!-- Spinner animation -->
-<style>
-@keyframes spin {
-from { transform: rotate(0deg); }
-to { transform: rotate(360deg); }
-}
-</style>
+<!-- Loading Popup -->
+<div id="loading-popup">
+    <div>
+        <div class="spinner-border text-light" role="status"></div>
+        <p class="mt-3">Processing your registration...</p>
+    </div>
+</div>
 
 <!-- Success Popup -->
-<div id="success-popup" style="
-    display: none;
-    position: fixed;
-    top: 0; left: 0;
-    width: 100%; height: 100%;
-    background: rgba(0,0,0,0.4);
-    z-index: 10000;
-    text-align: center;
-    padding-top: 20%;
-">
-    <div style="
-        background: #fff;
-        display: inline-block;
-        padding: 30px 50px;
-        border-radius: 10px;
-        font-size: 18px;
-        color: #333;
-        box-shadow: 0 0 15px rgba(0,0,0,0.3);
-    ">
-        <h3 style="color: #4CAF50;">✅ Registration Successful!</h3>
-        <p>You will be redirected to payment shortly...</p>
+<div id="success-popup">
+    <div>
+        <h3>✅ Registration Successful!</h3>
+        <p>Redirecting to payment page...</p>
     </div>
 </div>
- 
-
 
 <script>
 document.getElementById('registrationForm').addEventListener('submit', async function (e) {
-    e.preventDefault(); // stop normal submission
-    document.getElementById('loading-popup').style.display = 'block';
+    e.preventDefault();
+    document.getElementById('loading-popup').style.display = 'flex';
+
+    const formData = new FormData(this);
+    const data = {};
+    formData.forEach((value, key) => data[key] = value.trim());
+
+    // Validate email
+    if (!data.email || !data.email.includes('@')) {
+        alert('Please enter a valid email address.');
+        document.getElementById('loading-popup').style.display = 'none';
+        return;
+    }
 
     try {
-        const formData = new FormData(this);
         const response = await fetch('/register', {
             method: 'POST',
-            body: formData
+            headers: { 'Content-Type': 'application/json' },
+            body: JSON.stringify(data)
         });
 
         const result = await response.json();
         document.getElementById('loading-popup').style.display = 'none';
 
         if (response.ok) {
-            // Show success popup
-            document.getElementById('success-popup').style.display = 'block';
-
-            // Redirect to payment page after 2 seconds
+            document.getElementById('success-popup').style.display = 'flex';
             setTimeout(() => {
-                window.location.href = `/payment.html?pass=${encodeURIComponent(formData.get('passType'))}&email=${encodeURIComponent(formData.get('email'))}`;
+                window.location.href = `/payment.html?pass=${encodeURIComponent(data.passType)}&email=${encodeURIComponent(data.email)}`;
             }, 2000);
         } else {
             alert(result.message || 'Registration failed. Try again.');
@@ -223,6 +141,5 @@ document.getElementById('registrationForm').addEventListener('submit', async fun
 });
 </script>
 
-    
 </body>
 </html>
