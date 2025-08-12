@@ -37,22 +37,22 @@ const transporter = nodemailer.createTransport({
     },
 });
 
-// ------------------ Routes ------------------
+// ------------------ ROUTES ------------------
+
+// ✅ Serve Paystack public key to client
+app.get('/config/paystack', (req, res) => {
+    res.json({ key: process.env.PAYSTACK_PUBLIC_KEY || '' });
+});
 
 // Registration Route
 app.post('/register', async (req, res) => {
     try {
         const { fullname, email, phone, passType, age, gender, church } = req.body;
 
-        if (!email) {
-            return res.status(400).json({ message: "Email is required" });
-        }
+        if (!email) return res.status(400).json({ message: "Email is required" });
 
-        // Normalize amount based on pass type
         let amount = 999;
-        if (passType === 'Team Pass') {
-            amount = 4500;
-        }
+        if (passType === 'Team Pass') amount = 4500;
 
         const client = await pool.connect();
         await client.query(
@@ -62,23 +62,18 @@ app.post('/register', async (req, res) => {
         );
         client.release();
 
-        // Send confirmation email
         await transporter.sendMail({
             from: `"REPLIB YOUTH CAMP" <${process.env.EMAIL_USER}>`,
             to: email,
             subject: 'Youth Camp Registration Successful',
             html: `
                 <h2>Hello ${fullname},</h2>
-
-                <h3>Thank you for registering for REPLIB Youth Camp 2025.</h3>
-
-                <p>Your registration for REPLIB Youth Camp 2025 is confirmed. Just one more step to complete your registration!</p>
-
+                <p>Thank you for registering for <b>REPLIB Youth Camp 2025</b>.</p>
                 <p>Your selected pass: <b>${passType}</b> | Amount: GHS ${amount}</p>
-                
-                <p>We are absolutely excited to meet you.</p>
-                
-                <p>God bless you,<br>REPLIB Youth Team</p>
+                <p>Please complete your payment to secure your spot. Click the payment link below:</p>
+                <a href="${process.env.BASE_URL}/payment.html?pass=${encodeURIComponent(passType)}&email=${encodeURIComponent(email)}">Proceed to Payment</a>
+                <br><br>
+                <p style="margin-top:30px;font-size:14px;color:#555;">God bless you,<br>REPLIB Youth Team</p>
             `
         });
 
@@ -87,6 +82,50 @@ app.post('/register', async (req, res) => {
     } catch (err) {
         console.error("Registration error:", err);
         res.status(500).json({ message: "Error registering camper" });
+    }
+});
+
+// ✅ Verify Paystack payment immediately from payment.html
+app.post('/pay/verify', async (req, res) => {
+    const { reference, email } = req.body;
+    if (!reference) return res.status(400).json({ message: "No reference provided" });
+
+    try {
+        const r = await fetch(`https://api.paystack.co/transaction/verify/${reference}`, {
+            headers: { Authorization: `Bearer ${process.env.PAYSTACK_SECRET_KEY}` }
+        });
+        const data = await r.json();
+
+        if (!data.status || !data.data) {
+            return res.status(400).json({ message: "Paystack verification failed", details: data });
+        }
+
+        if (data.data.status === 'success') {
+            const paidAmount = data.data.amount / 100;
+
+            const client = await pool.connect();
+            await client.query(`UPDATE campers SET payment_status=$1 WHERE email=$2`, ['paid', email]);
+
+            const reg = await client.query(`SELECT id FROM campers WHERE email=$1`, [email]);
+            const regId = reg.rows[0] ? reg.rows[0].id : null;
+
+            await client.query(
+                `INSERT INTO payments (registration_id, amount, payment_reference, payment_status)
+                 VALUES ($1, $2, $3, $4)`,
+                [regId, paidAmount, reference, 'success']
+            );
+            client.release();
+
+            await sendReceiptEmail(email, reference, paidAmount);
+
+            return res.json({ message: 'Payment verified and recorded', reference, amount: paidAmount });
+        }
+
+        return res.status(400).json({ message: 'Transaction not successful', status: data.data.status });
+
+    } catch (err) {
+        console.error("Verification error:", err);
+        return res.status(500).json({ message: "Server error verifying payment" });
     }
 });
 
@@ -128,10 +167,7 @@ app.post('/admin/confirm-payment', async (req, res) => {
 
     try {
         const client = await pool.connect();
-        const camperResult = await client.query(
-            `SELECT amount FROM campers WHERE email = $1`,
-            [email]
-        );
+        const camperResult = await client.query(`SELECT amount FROM campers WHERE email = $1`, [email]);
 
         if (camperResult.rows.length === 0) {
             client.release();
@@ -139,10 +175,7 @@ app.post('/admin/confirm-payment', async (req, res) => {
         }
 
         const amount = camperResult.rows[0].amount;
-        await client.query(
-            `UPDATE campers SET payment_status = $1 WHERE email = $2`,
-            ['paid', email]
-        );
+        await client.query(`UPDATE campers SET payment_status = $1 WHERE email = $2`, ['paid', email]);
         client.release();
 
         await sendReceiptEmail(email, reference || 'BANK-' + Date.now(), amount);
@@ -156,7 +189,6 @@ app.post('/admin/confirm-payment', async (req, res) => {
 // Admin login
 app.post('/admin/login', (req, res) => {
     const { username, password } = req.body;
-
     if (username === process.env.ADMIN_USER && password === process.env.ADMIN_PASS) {
         req.session.admin = true;
         return res.json({ message: "Login successful" });
@@ -218,7 +250,7 @@ app.get('/admin/download-excel', checkAdminAuth, async (req, res) => {
     }
 });
 
-// ------------------ Helper Function ------------------
+// ------------------ HELPER FUNCTION ------------------
 async function sendReceiptEmail(email, reference, amount) {
     const doc = new PDFDocument();
     const receiptPath = path.join(__dirname, `receipt-${Date.now()}.pdf`);
@@ -229,6 +261,8 @@ async function sendReceiptEmail(email, reference, amount) {
     doc.fontSize(14).text(`Email: ${email}`);
     doc.text(`Amount: GHS ${amount}`);
     doc.text(`Reference: ${reference}`);
+    doc.moveDown();
+    doc.fontSize(12).text('Thank you for your payment. We look forward to seeing you at the camp.');
     doc.end();
 
     await new Promise(resolve => doc.on('finish', resolve));
@@ -237,18 +271,24 @@ async function sendReceiptEmail(email, reference, amount) {
         from: `"Replicants Youth" <${process.env.EMAIL_USER}>`,
         to: email,
         subject: 'Youth Camp Payment Receipt',
-        text: 'Thank you for your payment. Please find your receipt attached.',
+        html: `
+            <p>Dear Camper,</p>
+            <p>Thank you for your payment for the REPLIB Youth Camp 2025.</p>
+            <p><b>Amount Paid:</b> GHS ${amount}<br>
+               <b>Reference:</b> ${reference}</p>
+            <p>Attached is your official payment receipt.</p>
+            <br>
+            <p>God bless you,<br>
+            <b>REPLIB Youth Camp Team</b></p>
+        `,
         attachments: [
-            {
-                filename: 'receipt.pdf',
-                path: receiptPath,
-            },
+            { filename: 'receipt.pdf', path: receiptPath },
         ],
     });
 
     fs.unlinkSync(receiptPath);
 }
 
-// ------------------ Start Server ------------------
+// ------------------ START SERVER ------------------
 const PORT = process.env.PORT || 10000;
 app.listen(PORT, () => console.log(`Server running on port ${PORT}`));

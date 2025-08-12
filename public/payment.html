@@ -54,15 +54,14 @@
         .btn-primary:hover {
             background-color: #1b5fc6;
         }
-        .btn-outline-primary:hover {
-            background-color: #2575fc;
-            color: white;
-        }
         .bank-info {
             background: #f8f9fa;
             padding: 15px;
             border-radius: 10px;
             border: 1px solid #ddd;
+        }
+        #loadingSpinner {
+            display: none;
         }
     </style>
 </head>
@@ -80,7 +79,7 @@
             </div>
         </div>
 
-        <p class="text-center">Camp Fee: <strong>GH₵ 200</strong></p>
+        <p class="text-center">Camp Fee: <strong id="passDetails">Loading...</strong></p>
 
         <!-- Payment Options -->
         <div class="d-grid gap-2">
@@ -106,48 +105,82 @@
         </div>
 
         <div id="paymentMessage" class="alert mt-3 d-none"></div>
+        <div class="text-center mt-3" id="loadingSpinner">
+            <div class="spinner-border text-primary" role="status"></div>
+            <p class="mt-2">Processing your payment...</p>
+        </div>
     </div>
 
     <!-- Paystack Inline Script -->
     <script src="https://js.paystack.co/v1/inline.js"></script>
     <script>
-        document.addEventListener("DOMContentLoaded", function () {
-    const urlParams = new URLSearchParams(window.location.search);
-    const passType = urlParams.get('pass');
-    const email = urlParams.get('email');
-    
-    let amount = 0;
-    let displayText = '';
+        document.addEventListener("DOMContentLoaded", async function () {
+            const urlParams = new URLSearchParams(window.location.search);
+            const passType = urlParams.get('pass');
+            const email = urlParams.get('email');
+            
+            let amount = 0;
+            let displayText = '';
 
-    if (passType === "general") {
-        amount = 999;
-        displayText = "General Pass - GH₵ 999";
-    } else if (passType === "team") {
-        amount = 4500;
-        displayText = "Team Pass - GH₵ 4500";
-    }
-
-    document.querySelector(".text-center strong").textContent = displayText;
-
-    document.getElementById("momoPayBtn").addEventListener("click", function () {
-        let handler = PaystackPop.setup({
-            key: 'pk_test_cf268d18771b8268d79c1b4592e56f284e0aeb8d',
-            email: email,
-            amount: amount * 100, // Convert to pesewas
-            currency: "GHS",
-            callback: function (response) {
-                const msgDiv = document.getElementById("paymentMessage");
-                msgDiv.textContent = "Payment successful! Ref: " + response.reference;
-                msgDiv.classList.remove("d-none", "alert-danger");
-                msgDiv.classList.add("alert", "alert-success");
-            },
-            onClose: function () {
-                alert('Payment window closed.');
+            if (passType === "general") {
+                amount = 999;
+                displayText = "General Pass - GH₵ 999";
+            } else if (passType === "team") {
+                amount = 4500;
+                displayText = "Team Pass - GH₵ 4500";
             }
+
+            document.getElementById("passDetails").textContent = displayText;
+
+            // Fetch Paystack Public Key from server
+            const configRes = await fetch('/config/paystack');
+            const configData = await configRes.json();
+            const paystackKey = configData.key;
+
+            document.getElementById("momoPayBtn").addEventListener("click", function () {
+                let handler = PaystackPop.setup({
+                    key: paystackKey,
+                    email: email,
+                    amount: amount * 100,
+                    currency: "GHS",
+                    callback: function (response) {
+                        document.getElementById("loadingSpinner").style.display = "block";
+                        
+                        // Verify payment with backend
+                        fetch('/pay/verify', {
+                            method: 'POST',
+                            headers: { 'Content-Type': 'application/json' },
+                            body: JSON.stringify({ reference: response.reference, email })
+                        })
+                        .then(res => res.json())
+                        .then(data => {
+                            document.getElementById("loadingSpinner").style.display = "none";
+                            const msgDiv = document.getElementById("paymentMessage");
+                            if (data.message && !data.message.includes("not successful")) {
+                                msgDiv.textContent = "✅ Payment successful! Your receipt has been sent to your email.";
+                                msgDiv.classList.remove("d-none", "alert-danger");
+                                msgDiv.classList.add("alert", "alert-success");
+                            } else {
+                                msgDiv.textContent = "⚠ Payment could not be verified.";
+                                msgDiv.classList.remove("d-none", "alert-success");
+                                msgDiv.classList.add("alert", "alert-danger");
+                            }
+                        })
+                        .catch(err => {
+                            document.getElementById("loadingSpinner").style.display = "none";
+                            const msgDiv = document.getElementById("paymentMessage");
+                            msgDiv.textContent = "❌ Error verifying payment.";
+                            msgDiv.classList.remove("d-none", "alert-success");
+                            msgDiv.classList.add("alert", "alert-danger");
+                        });
+                    },
+                    onClose: function () {
+                        alert('Payment window closed.');
+                    }
+                });
+                handler.openIframe();
+            });
         });
-        handler.openIframe();
-    });
-});
     </script>
 </body>
 </html>
