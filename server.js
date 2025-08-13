@@ -79,7 +79,7 @@ app.post('/register', async (req, res) => {
                 <p>You will receive an E- receipt after completing payment of your registration.</p>
                 <p>Your selected pass: <b>${passType}</b> | Amount: GHS ${amount}</p>
                 <p>Kindly present this receipt at our frontdesk upon arrival.<p>
-                <p>We are excited to have you join us for this unforgetable experience.<p>
+                <p>We are excited to have you join us for this unforgettable experience.<p>
                 <p>Can't wait to meet you, ${fullname}!</p>
                 <br>
                 <p>God bless you,<br><b>REPLIB Youth Team</b></p>
