@@ -61,7 +61,7 @@ app.post('/register', async (req, res) => {
 
         const client = await pool.connect();
         await client.query(
-            `INSERT INTO campers(fullname, email, phone, pass_type, amount, payment_status, age, gender, church)
+            `INSERT INTO registrations(fullname, email, phone, pass_type, amount, payment_status, age, gender, church)
              VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9)`,
             [fullname, email, phone, passType, amount, 'pending', age, gender, church]
         );
