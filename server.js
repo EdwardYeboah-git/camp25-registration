@@ -83,7 +83,7 @@ app.post('/register', async (req, res) => {
                 <p>Can't wait to meet you, ${fullname}!</p>
                 <br>
                 <p>God bless you,<br><b>REPLIB Youth Team</b></p>
-                <img src="https://i.ibb.co/4s5Thtf/signature.png" alt="Signature" style="max-width:200px;">
+                <img src="https://camp25-registration.onrender.com//images/church-logo.png" alt="Signature" style="max-width:200px;">
             `
         });
 
