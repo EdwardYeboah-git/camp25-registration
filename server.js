@@ -9,8 +9,16 @@ const PDFDocument = require('pdfkit');
 const fs = require('fs');
 const crypto = require('crypto');
 const ExcelJS = require('exceljs');
+const cors = require('cors');
 
 const app = express();
+
+
+app.use(cors({
+    origin: 'https://edwardyeboah-git.github.io.', // your GitHub Pages site
+    methods: ['GET', 'POST'],
+    credentials: true
+}));
 
 // Middleware
 app.use(bodyParser.json());
