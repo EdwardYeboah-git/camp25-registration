@@ -74,10 +74,13 @@ app.post('/register', async (req, res) => {
             subject: 'Youth Camp Registration Successful',
             html: `
                 <h2>Hello ${fullname},</h2>
-                <h3>Thank you for registering for REPLIB Youth Camp 2025.</h3>
-                <p>Your registration is confirmed. Just one more step to complete your registration!</p>
+                <h3>Thank you for registering for REPLIB Youth Camp 2025, ${fullname}.</h3>
+                <p><h3>Congratulations!<h3>Your registration is successful and has been confirmed.<p> 
+                <p>You will receive an E- receipt after completing payment of your registration.</p>
                 <p>Your selected pass: <b>${passType}</b> | Amount: GHS ${amount}</p>
-                <p>We are excited to meet you!</p>
+                <p>Kindly present this receipt at our frontdesk upon arrival.<p>
+                <p>We are excited to have you join us for this unforgetable experience.<p>
+                <p>Can't wait to meet you, ${fullname}!</p>
                 <br>
                 <p>God bless you,<br><b>REPLIB Youth Team</b></p>
                 <img src="https://i.ibb.co/4s5Thtf/signature.png" alt="Signature" style="max-width:200px;">
