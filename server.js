@@ -206,6 +206,60 @@ app.post('/hubtel/callback', bodyParser.json(), async (req, res) => {
     }
 });
 
+// Check Hubtel Transaction Status + Auto Update DB
+app.get("/hubtel/check-status/:transactionId", async (req, res) => {
+    const { transactionId } = req.params;
+
+    try {
+        const response = await axios.get(
+            `https://payproxyapi.hubtel.com/items/${transactionId}/status`,
+            {
+                headers: {
+                    Authorization: "Basic " + Buffer.from(
+                        process.env.HUBTEL_CLIENT_ID + ":" + process.env.HUBTEL_CLIENT_SECRET
+                    ).toString("base64"),
+                    "Content-Type": "application/json"
+                }
+            }
+        );
+
+        const statusData = response.data;
+        console.log("Hubtel Status Data:", statusData);
+
+        const status = statusData?.data?.status; // "Success", "Failed", "Pending"
+        const amount = statusData?.data?.amount;
+        const reference = statusData?.data?.clientReference;
+        const email = statusData?.data?.customer?.email;
+
+        if (email) {
+            const client = await pool.connect();
+
+            if (status === "Success") {
+                await client.query(
+                    `UPDATE campers SET payment_status = $1 WHERE email = $2`,
+                    ['paid', email]
+                );
+
+                // Send receipt email if not already sent
+                await sendReceiptEmail(email, reference, amount);
+            } else if (status === "Failed") {
+                await client.query(
+                    `UPDATE campers SET payment_status = $1 WHERE email = $2`,
+                    ['failed', email]
+                );
+            }
+
+            client.release();
+        }
+
+        res.json(statusData);
+
+    } catch (err) {
+        console.error("Hubtel status check error:", err.response?.data || err.message);
+        res.status(500).json({ message: "Error checking transaction status" });
+    }
+});
+
 
 // ------------------ Admin Routes ------------------
 
