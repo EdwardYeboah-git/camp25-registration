@@ -1,0 +1,58 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>Payment Successful - Youth Camp 2025</title>
+  <link href="https://cdn.jsdelivr.net/npm/bootstrap@5.3.0/dist/css/bootstrap.min.css" rel="stylesheet">
+  <style>
+    body {
+      background: url('images/YouthCamp.png') no-repeat center center/cover;
+      min-height: 100vh;
+      display: flex;
+      justify-content: center;
+      align-items: center;
+      text-align: center;
+      color: white;
+      font-family: 'Segoe UI', sans-serif;
+    }
+    .overlay {
+      position: absolute;
+      top: 0; left: 0; width: 100%; height: 100%;
+      background: rgba(0,0,0,0.6);
+      z-index: 0;
+    }
+    .content {
+      position: relative;
+      z-index: 1;
+      background: rgba(255,255,255,0.95);
+      color: #333;
+      padding: 30px;
+      border-radius: 15px;
+      max-width: 500px;
+      box-shadow: 0 4px 15px rgba(0,0,0,0.3);
+    }
+    h1 { color: #28a745; font-weight: bold; }
+    .btn-home {
+      background: #2575fc;
+      border: none;
+      padding: 10px 20px;
+      color: white;
+      border-radius: 8px;
+      text-decoration: none;
+    }
+    .btn-home:hover {
+      background: #1b5fc6;
+    }
+  </style>
+</head>
+<body>
+  <div class="overlay"></div>
+  <div class="content">
+    <h1>🎉 Payment Successful!</h1>
+    <p>Thank you for completing your payment for <strong>REPLIB Youth Camp 2025</strong>.</p>
+    <p>Your spot has been confirmed. A receipt has been sent to your email.</p>
+    <a href="/" class="btn-home">Go to Home</a>
+  </div>
+</body>
+</html>

@@ -144,68 +144,67 @@
                 <option value="team">Team Pass - GH₵ 4500</option>
             </select>
         </div>
-        <button type="submit" class="btn btn-primary w-100 py-2">Continue to Payment</button>
-    </form>
-</div>
+        <button type="submit" class="btn btn-primary w-100 py-2" id="registerBtn"> <span id="btnText">Click to Register</span>
+            <span id="btnSpinner" class="spinner-border spinner-border-sm ms-2 d-none" role="status" aria-hidden="true"></span>
+          </button>
+        </div>
+      </form>
 
-<!-- Loading Popup -->
-<div id="loading-popup">
-    <div class="content">
-        <p>Processing your registration...<br>Please wait.</p>
-        <div class="spinner"></div>
-    </div>
-</div>
-
-<!-- Success Popup -->
-<div id="success-popup">
-    <div class="content">
-        <h3 style="color: #4CAF50;">✅ Registration Successful!</h3>
-        <p>You will be redirected to payment shortly...</p>
-    </div>
+      <!-- Message -->
+    <div id="registerMessage" class="alert mt-3"></div>
 </div>
 
 <script>
-document.getElementById('registrationForm').addEventListener('submit', async function (e) {
-    e.preventDefault();
-    document.getElementById('loading-popup').style.display = 'block';
+    const form = document.getElementById("registrationForm");
+    const btn = document.getElementById("registerBtn");
+    const btnText = document.getElementById("btnText");
+    const btnSpinner = document.getElementById("btnSpinner");
+    const msgDiv = document.getElementById("registerMessage");
 
-    const formData = new FormData(this);
-    const data = {};
-    formData.forEach((value, key) => data[key] = value.trim());
+    form.addEventListener("submit", async function(e) {
+      e.preventDefault();
+      const formData = Object.fromEntries(new FormData(form).entries());
 
-    // Email validation
-    const emailPattern = /^[^@\s]+@[^@\s]+\.[^@\s]+$/;
-    if (!emailPattern.test(data.email)) {
-        alert('Please enter a valid email address.');
-        document.getElementById('loading-popup').style.display = 'none';
-        return;
-    }
+      // Show loading state
+      btn.disabled = true;
+      btnText.textContent = "Processing...";
+      btnSpinner.classList.remove("d-none");
+      msgDiv.className = "alert alert-info mt-3";
+      msgDiv.textContent = "Submitting registration... please wait.";
+      msgDiv.style.display = "block";
 
-    try {
-        const response = await fetch('/register', {
-            method: 'POST',
-            headers: { 'Content-Type': 'application/json' },
-            body: JSON.stringify(data)
+      try {
+        const response = await fetch("/register", {
+          method: "POST",
+          headers: { "Content-Type": "application/json" },
+          body: JSON.stringify(formData)
         });
 
-        const result = await response.json();
-        document.getElementById('loading-popup').style.display = 'none';
+        const data = await response.json();
 
         if (response.ok) {
-            document.getElementById('success-popup').style.display = 'block';
-            setTimeout(() => {
-                window.location.href = `/payment.html?pass=${encodeURIComponent(data.passType)}&email=${encodeURIComponent(data.email)}`;
-            }, 2000);
+          msgDiv.className = "alert alert-success mt-3";
+          msgDiv.textContent = "Registration successful! Redirecting to payment...";
+          setTimeout(() => {
+            const pass = formData.passType === "Team Pass" ? "team" : "general";
+            window.location.href = `/payment.html?pass=${pass}&email=${encodeURIComponent(formData.email)}`;
+          }, 1500);
         } else {
-            alert(result.message || 'Registration failed. Try again.');
+          msgDiv.className = "alert alert-danger mt-3";
+          msgDiv.textContent = data.message || "Registration failed. Please try again.";
+          btn.disabled = false;
+          btnText.textContent = "Register";
+          btnSpinner.classList.add("d-none");
         }
-    } catch (error) {
-        document.getElementById('loading-popup').style.display = 'none';
-        alert('Error submitting form. Please try again.');
-        console.error(error);
-    }
-});
-</script>
-
+      } catch (err) {
+        console.error(err);
+        msgDiv.className = "alert alert-danger mt-3";
+        msgDiv.textContent = "Error submitting form.";
+        btn.disabled = false;
+        btnText.textContent = "Register";
+        btnSpinner.classList.add("d-none");
+      }
+    });
+  </script>
 </body>
 </html>
