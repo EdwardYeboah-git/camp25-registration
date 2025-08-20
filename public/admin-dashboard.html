@@ -26,11 +26,11 @@
       </select>
     </div>
     <div class="col-md-3">
-      <select id="passFilter" class="form-select">
-        <option value="">All Pass Types</option>
-        <option value="general">General Pass</option>
-        <option value="team">Team Pass</option>
-      </select>
+        <select id="passFilter" class="form-select">
+            <option value="">All Pass Types</option>
+            <option value="General Pass">General Pass</option>
+            <option value="Team Pass">Team Pass</option>
+          </select>
     </div>
   </div>
 
@@ -56,10 +56,14 @@
   let campersData = [];
 
   async function fetchCampers() {
-    const res = await fetch('/admin/campers');
-    campersData = await res.json();
-    renderTable(campersData);
+  const res = await fetch('/admin/campers');
+  if (res.status === 401 || res.status === 403) {
+    window.location.href = '/admin-login.html';
+    return;
   }
+  campersData = await res.json();
+  renderTable(campersData);
+}
 
   function renderTable(data) {
     const tbody = document.querySelector('#campersTable tbody');

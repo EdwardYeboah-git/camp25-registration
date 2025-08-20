@@ -92,47 +92,47 @@ app.post('/register', async (req, res) => {
 
 // Create Hubtel Payment
 app.post("/hubtel/create-payment", async (req, res) => {
-    const { email, amount } = req.body;
-
+    const { email, amount, phone } = req.body; // include phone
+  
     try {
-        const response = await axios.post(
-            "https://payproxyapi.hubtel.com/items/initiate",
-            {
-                totalAmount: amount,
-                description: "Youth Camp 2025 Registration",
-                callbackUrl: process.env.HUBTEL_CALLBACK_URL,
-                returnUrl: "https://camp25-registration.onrender.com/payment-success.html",
-                merchantAccountNumber: process.env.HUBTEL_CLIENT_ID,
-                clientReference: "CAMP-" + Date.now(),
-                customerEmail: email
-            },
-            {
-                headers: {
-                    Authorization: "Basic " + Buffer.from(
-                        process.env.HUBTEL_CLIENT_ID + ":" + process.env.HUBTEL_CLIENT_SECRET
-                    ).toString("base64"),
-                    "Content-Type": "application/json"
-                }
-            }
-        );
-
-        const { checkoutUrl, transactionId } = response.data.data;
-
-        // Save transactionId to DB
-        const client = await pool.connect();
-        await client.query(
-            `UPDATE campers SET transaction_id = $1 WHERE email = $2`,
-            [transactionId, email]
-        );
-        client.release();
-
-        res.json({ checkoutUrl });
+      const response = await axios.post(
+        "https://payproxyapi.hubtel.com/items/initiate",
+        {
+          totalAmount: amount,
+          description: "Youth Camp 2025 Registration",
+          callbackUrl: process.env.HUBTEL_CALLBACK_URL,
+          returnUrl: "https://camp25-registration.onrender.com/payment-success.html",
+          merchantAccountNumber: String(process.env.HUBTEL_MERCHANT_ACCOUNT).trim(), // ✅ use the merchant account
+          clientReference: "CAMP-" + Date.now(),
+          customerEmail: email,
+          customerMsisdn: phone // ✅ forward phone to Hubtel
+        },
+        {
+          headers: {
+            Authorization: "Basic " + Buffer.from(
+              process.env.HUBTEL_CLIENT_ID + ":" + process.env.HUBTEL_CLIENT_SECRET
+            ).toString("base64"),
+            "Content-Type": "application/json"
+          }
+        }
+      );
+  
+      const { checkoutUrl, transactionId } = response.data.data;
+  
+      // Save transactionId to DB
+      const client = await pool.connect();
+      await client.query(
+        `UPDATE campers SET transaction_id = $1 WHERE email = $2`,
+        [transactionId, email]
+      );
+      client.release();
+  
+      res.json({ checkoutUrl });
     } catch (err) {
-        console.error("Hubtel error:", err.response?.data || err.message);
-        res.status(500).json({ message: "Hubtel payment init failed" });
+      console.error("Hubtel error:", err.response?.data || err.message);
+      res.status(500).json({ message: "Hubtel payment init failed" });
     }
-});
-
+  });
 // Hubtel Callback
 app.post('/hubtel/callback', bodyParser.json(), async (req, res) => {
     try {
@@ -209,58 +209,58 @@ app.post('/hubtel/callback', bodyParser.json(), async (req, res) => {
 // Check Hubtel Transaction Status + Auto Update DB
 app.get("/hubtel/check-status/:transactionId", async (req, res) => {
     const { transactionId } = req.params;
-
+  
     try {
-        const response = await axios.get(
-            `https://payproxyapi.hubtel.com/items/${transactionId}/status`,
-            {
-                headers: {
-                    Authorization: "Basic " + Buffer.from(
-                        process.env.HUBTEL_CLIENT_ID + ":" + process.env.HUBTEL_CLIENT_SECRET
-                    ).toString("base64"),
-                    "Content-Type": "application/json"
-                }
-            }
-        );
-
-        const statusData = response.data;
-        console.log("Hubtel Status Data:", statusData);
-
-        const status = statusData?.data?.status; // "Success", "Failed", "Pending"
-        const amount = statusData?.data?.amount;
-        const reference = statusData?.data?.clientReference;
-        const email = statusData?.data?.customer?.email;
-
-        if (email) {
-            const client = await pool.connect();
-
-            if (status === "Success") {
-                await client.query(
-                    `UPDATE campers SET payment_status = $1 WHERE email = $2`,
-                    ['paid', email]
-                );
-
-                // Send receipt email if not already sent
-                await sendReceiptEmail(email, reference, amount);
-            } else if (status === "Failed") {
-                await client.query(
-                    `UPDATE campers SET payment_status = $1 WHERE email = $2`,
-                    ['failed', email]
-                );
-            }
-
-            client.release();
+      const { data: raw } = await axios.get(
+        `https://payproxyapi.hubtel.com/items/${transactionId}/status`,
+        {
+          headers: {
+            Authorization: "Basic " + Buffer.from(
+              process.env.HUBTEL_CLIENT_ID + ":" + process.env.HUBTEL_CLIENT_SECRET
+            ).toString("base64"),
+            "Content-Type": "application/json"
+          }
         }
-
-        res.json(statusData);
-
+      );
+  
+      const d = raw?.data || {};
+      const status = d.status; // Success / Failed / Pending / Cancelled
+      const amount = d.amount;
+      const reference = d.clientReference;
+  
+      let email = d.customerEmail || d.customer?.email || null;
+      const msisdn = d.customerMsisdn || d.customer?.msisdn || null;
+  
+      const client = await pool.connect();
+  
+      // Try to resolve email by phone if missing
+      if (!email && msisdn) {
+        const q = await client.query(`SELECT email FROM campers WHERE phone = $1 LIMIT 1`, [msisdn]);
+        if (q.rows.length) email = q.rows[0].email;
+      }
+  
+      if (email) {
+        // Check current status to avoid duplicate receipts
+        const cur = await client.query(`SELECT payment_status, amount FROM campers WHERE email = $1 LIMIT 1`, [email]);
+        const currentStatus = cur.rows[0]?.payment_status;
+  
+        if (status === "Success") {
+          if (currentStatus !== 'paid') {
+            await client.query(`UPDATE campers SET payment_status = 'paid' WHERE email = $1`, [email]);
+            await sendReceiptEmail(email, reference, amount);
+          }
+        } else if (status === "Failed") {
+          await client.query(`UPDATE campers SET payment_status = 'failed' WHERE email = $1`, [email]);
+        }
+      }
+  
+      client.release();
+      res.json(raw);
     } catch (err) {
-        console.error("Hubtel status check error:", err.response?.data || err.message);
-        res.status(500).json({ message: "Error checking transaction status" });
+      console.error("Hubtel status check error:", err.response?.data || err.message);
+      res.status(500).json({ message: "Error checking transaction status" });
     }
-});
-
-
+  });
 // ------------------ Admin Routes ------------------
 
 // Admin login

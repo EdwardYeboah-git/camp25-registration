@@ -144,67 +144,63 @@
                 <option value="team">Team Pass - GH₵ 4500</option>
             </select>
         </div>
-        <button type="submit" class="btn btn-primary w-100 py-2" id="registerBtn"> <span id="btnText">Click to Register</span>
+        <button type="submit" class="btn btn-primary w-100 py-2" id="registerBtn">
+            <span id="btnText">Click to Register</span>
             <span id="btnSpinner" class="spinner-border spinner-border-sm ms-2 d-none" role="status" aria-hidden="true"></span>
           </button>
-        </div>
-      </form>
-
-      <!-- Message -->
-    <div id="registerMessage" class="alert mt-3"></div>
-</div>
-
-<script>
-    const form = document.getElementById("registrationForm");
-    const btn = document.getElementById("registerBtn");
-    const btnText = document.getElementById("btnText");
-    const btnSpinner = document.getElementById("btnSpinner");
-    const msgDiv = document.getElementById("registerMessage");
-
-    form.addEventListener("submit", async function(e) {
-      e.preventDefault();
-      const formData = Object.fromEntries(new FormData(form).entries());
-
-      // Show loading state
-      btn.disabled = true;
-      btnText.textContent = "Processing...";
-      btnSpinner.classList.remove("d-none");
-      msgDiv.className = "alert alert-info mt-3";
-      msgDiv.textContent = "Submitting registration... please wait.";
-      msgDiv.style.display = "block";
-
-      try {
-        const response = await fetch("/register", {
-          method: "POST",
-          headers: { "Content-Type": "application/json" },
-          body: JSON.stringify(formData)
-        });
-
-        const data = await response.json();
-
-        if (response.ok) {
-          msgDiv.className = "alert alert-success mt-3";
-          msgDiv.textContent = "Registration successful! Redirecting to payment...";
-          setTimeout(() => {
-            const pass = formData.passType === "Team Pass" ? "team" : "general";
-            window.location.href = `/payment.html?pass=${passType.toLowerCase()}&email=${encodeURIComponent(formData.email)}&phone=${encodeURIComponent(formData.phone)}`;
-          }, 1500);
-        } else {
-          msgDiv.className = "alert alert-danger mt-3";
-          msgDiv.textContent = data.message || "Registration failed. Please try again.";
-          btn.disabled = false;
-          btnText.textContent = "Register";
-          btnSpinner.classList.add("d-none");
-        }
-      } catch (err) {
-        console.error(err);
-        msgDiv.className = "alert alert-danger mt-3";
-        msgDiv.textContent = "Error submitting form.";
-        btn.disabled = false;
-        btnText.textContent = "Register";
-        btnSpinner.classList.add("d-none");
-      }
-    });
-  </script>
-</body>
-</html>
+          </form> <!-- removed the extra stray </div> that was before this line -->
+          
+          <div id="registerMessage" class="alert mt-3"></div>
+          
+          <script>
+            const form = document.getElementById("registrationForm");
+            const btn = document.getElementById("registerBtn");
+            const btnText = document.getElementById("btnText");
+            const btnSpinner = document.getElementById("btnSpinner");
+            const msgDiv = document.getElementById("registerMessage");
+          
+            form.addEventListener("submit", async function(e) {
+              e.preventDefault();
+              const formData = Object.fromEntries(new FormData(form).entries());
+          
+              btn.disabled = true;
+              btnText.textContent = "Processing...";
+              btnSpinner.classList.remove("d-none");
+              msgDiv.className = "alert alert-info mt-3";
+              msgDiv.textContent = "Submitting registration... please wait.";
+              msgDiv.style.display = "block";
+          
+              try {
+                const response = await fetch("/register", {
+                  method: "POST",
+                  headers: { "Content-Type": "application/json" },
+                  body: JSON.stringify(formData)
+                });
+          
+                const data = await response.json();
+          
+                if (response.ok) {
+                  msgDiv.className = "alert alert-success mt-3";
+                  msgDiv.textContent = "Registration successful! Redirecting to payment...";
+                  setTimeout(() => {
+                    const pass = formData.passType; // "general" or "team"
+                    window.location.href =
+                      `/payment.html?pass=${pass}&email=${encodeURIComponent(formData.email)}&phone=${encodeURIComponent(formData.phone)}`;
+                  }, 1500);
+                } else {
+                  msgDiv.className = "alert alert-danger mt-3";
+                  msgDiv.textContent = data.message || "Registration failed. Please try again.";
+                  btn.disabled = false;
+                  btnText.textContent = "Click to Register";
+                  btnSpinner.classList.add("d-none");
+                }
+              } catch (err) {
+                console.error(err);
+                msgDiv.className = "alert alert-danger mt-3";
+                msgDiv.textContent = "Error submitting form.";
+                btn.disabled = false;
+                btnText.textContent = "Click to Register";
+                btnSpinner.classList.add("d-none");
+              }
+            });
+          </script>
