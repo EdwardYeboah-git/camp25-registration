@@ -103,7 +103,8 @@ app.post("/hubtel/create-payment", async (req, res) => {
                 callbackUrl: process.env.HUBTEL_CALLBACK_URL,
                 returnUrl: "https://camp25-registration.onrender.com/payment-success.html",
                 merchantAccountNumber: process.env.HUBTEL_CLIENT_ID,
-                clientReference: "CAMP-" + Date.now()
+                clientReference: "CAMP-" + Date.now(),
+                customerEmail: email
             },
             {
                 headers: {
@@ -115,7 +116,17 @@ app.post("/hubtel/create-payment", async (req, res) => {
             }
         );
 
-        res.json({ checkoutUrl: response.data.data.checkoutUrl });
+        const { checkoutUrl, transactionId } = response.data.data;
+
+        // Save transactionId to DB
+        const client = await pool.connect();
+        await client.query(
+            `UPDATE campers SET transaction_id = $1 WHERE email = $2`,
+            [transactionId, email]
+        );
+        client.release();
+
+        res.json({ checkoutUrl });
     } catch (err) {
         console.error("Hubtel error:", err.response?.data || err.message);
         res.status(500).json({ message: "Hubtel payment init failed" });
@@ -128,12 +139,49 @@ app.post('/hubtel/callback', bodyParser.json(), async (req, res) => {
         const data = req.body;
         console.log("Hubtel Callback Data:", data);
 
-        const status = data.Status;
-        const amount = data.Amount;
-        const reference = data.ClientReference;
-        const email = data.CustomerEmail;
+        const transactionId = data.TransactionId;
+        if (!transactionId) {
+            console.error("No TransactionId in callback");
+            return res.sendStatus(400);
+        }
+
+        // ✅ Call Hubtel Transaction Status API
+        const verifyRes = await axios.get(
+            `https://payproxyapi.hubtel.com/items/${transactionId}/status`,
+            {
+                headers: {
+                    Authorization: "Basic " + Buffer.from(
+                        process.env.HUBTEL_CLIENT_ID + ":" + process.env.HUBTEL_CLIENT_SECRET
+                    ).toString("base64")
+                }
+            }
+        );
+
+        const statusData = verifyRes.data.data;
+        const status = statusData.status;  // Success, Failed, Cancelled
+        const amount = statusData.amount;
+        const reference = statusData.clientReference;
+        let email = statusData.customerEmail;
+        let phone = statusData.customerMsisdn;
 
         const client = await pool.connect();
+
+        // fallback to phone if no email
+        if (!email && phone) {
+            const result = await client.query(
+                `SELECT email FROM campers WHERE phone = $1 LIMIT 1`,
+                [phone]
+            );
+            if (result.rows.length > 0) {
+                email = result.rows[0].email;
+            }
+        }
+
+        if (!email) {
+            console.error("No email/phone match found for transaction", transactionId);
+            client.release();
+            return res.sendStatus(400);
+        }
 
         if (status === "Success") {
             await client.query(
@@ -151,40 +199,13 @@ app.post('/hubtel/callback', bodyParser.json(), async (req, res) => {
             client.release();
             return res.redirect("https://camp25-registration.onrender.com/payment-failed.html");
         }
+
     } catch (err) {
-        console.error("Hubtel Callback Error:", err);
+        console.error("Hubtel Callback Error:", err.response?.data || err.message);
         res.sendStatus(500);
     }
 });
 
-// Confirm payment manually (bank transfer)
-app.post("/admin/confirm-payment", checkAdminAuth, bodyParser.urlencoded({ extended: true }), async (req, res) => {
-    const { email, reference } = req.body;
-
-    try {
-        const client = await pool.connect();
-        const result = await client.query(
-            `UPDATE campers SET payment_status = $1 WHERE email = $2 RETURNING email, amount`,
-            ['paid', email]
-        );
-        client.release();
-
-        if (result.rowCount === 0) {
-            return res.status(404).json({ message: "Camper not found" });
-        }
-
-        // Camper details
-        const camper = result.rows[0];
-
-        // Send receipt email (re-uses helper you already have)
-        await sendReceiptEmail(email, reference || "Manual-Confirmation", camper.amount);
-
-        res.json({ message: "Payment confirmed" });
-    } catch (err) {
-        console.error("Manual confirmation error:", err);
-        res.status(500).json({ message: "Error confirming payment" });
-    }
-});
 
 // ------------------ Admin Routes ------------------
 
@@ -258,6 +279,39 @@ app.get('/admin/download-excel', checkAdminAuth, async (req, res) => {
         res.status(500).json({ message: "Error generating Excel" });
     }
 });
+
+// Confirm payment manually (bank transfer)
+app.post("/admin/confirm-payment", checkAdminAuth, bodyParser.urlencoded({ extended: true }), async (req, res) => {
+    const { email, reference } = req.body;
+
+    try {
+        const client = await pool.connect();
+        const result = await client.query(
+            `UPDATE campers 
+             SET payment_status = $1 
+             WHERE email = $2 
+             RETURNING email, amount`,
+            ['paid', email]
+        );
+        client.release();
+
+        if (result.rowCount === 0) {
+            return res.status(404).json({ message: "Camper not found" });
+        }
+
+        // Camper details
+        const camper = result.rows[0];
+
+        // Send receipt email
+        await sendReceiptEmail(email, reference || "Manual-Confirmation", camper.amount);
+
+        res.json({ message: "Payment confirmed" });
+    } catch (err) {
+        console.error("Manual confirmation error:", err);
+        res.status(500).json({ message: "Error confirming payment" });
+    }
+});
+
 
 // ------------------ Helper Functions ------------------
 async function sendReceiptEmail(email, reference, amount) {

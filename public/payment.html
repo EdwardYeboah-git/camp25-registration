@@ -118,10 +118,11 @@
       const urlParams = new URLSearchParams(window.location.search);
       const passType = urlParams.get('pass');
       const email = urlParams.get('email');
-      
+      const phone = urlParams.get('phone');   // ✅ added
+  
       let amount = 0;
       let displayText = '';
-
+  
       if (passType === "general") {
           amount = 999;
           displayText = "General Pass - GH₵ 999";
@@ -129,40 +130,39 @@
           amount = 4500;
           displayText = "Team Pass - GH₵ 4500";
       }
-
+  
       document.getElementById("feeText").textContent = displayText;
-
+  
       document.getElementById("momoPayBtn").addEventListener("click", async function () {
           const msgDiv = document.getElementById("paymentMessage");
-          msgDiv.className = "alert alert-info mt-3";
+          msgDiv.style.display = "block";
+          msgDiv.className = "alert alert-info";
           msgDiv.textContent = "Initializing payment... please wait.";
-          msgDiv.classList.remove("d-none");
-
+  
           try {
               const response = await fetch("/hubtel/create-payment", {
                   method: "POST",
                   headers: { "Content-Type": "application/json" },
-                  body: JSON.stringify({ email, amount })
+                  body: JSON.stringify({ email, phone, amount })   // ✅ include phone
               });
-
+  
               const data = await response.json();
               if (data.checkoutUrl) {
-                  msgDiv.className = "alert alert-success mt-3";
+                  msgDiv.className = "alert alert-success";
                   msgDiv.textContent = "Redirecting to Hubtel checkout...";
                   setTimeout(() => {
                     window.location.href = data.checkoutUrl;
                   }, 1000);
               } else {
-                  msgDiv.className = "alert alert-danger mt-3";
+                  msgDiv.className = "alert alert-danger";
                   msgDiv.textContent = "Payment initialization failed.";
               }
           } catch (err) {
               console.error(err);
-              msgDiv.className = "alert alert-danger mt-3";
+              msgDiv.className = "alert alert-danger";
               msgDiv.textContent = "Error initializing payment.";
           }
       });
     });
   </script>
-</body>
-</html>
+  

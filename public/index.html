@@ -187,7 +187,7 @@
           msgDiv.textContent = "Registration successful! Redirecting to payment...";
           setTimeout(() => {
             const pass = formData.passType === "Team Pass" ? "team" : "general";
-            window.location.href = `/payment.html?pass=${pass}&email=${encodeURIComponent(formData.email)}`;
+            window.location.href = `/payment.html?pass=${passType.toLowerCase()}&email=${encodeURIComponent(formData.email)}&phone=${encodeURIComponent(formData.phone)}`;
           }, 1500);
         } else {
           msgDiv.className = "alert alert-danger mt-3";
