@@ -105,9 +105,9 @@ app.post("/hubtel/create-payment", async (req, res) => {
         {
           totalAmount: amount,
           description: "Youth Camp 2025 Registration",
-          callbackUrl: process.env.HUBTEL_CALLBACK_URL,
+          callbackUrl: "https://camp25-registration.onrender.com/hubtel/callback",
           returnUrl: "https://camp25-registration.onrender.com/payment-success.html",
-          merchantAccountNumber: String(process.env.HUBTEL_MERCHANT_ACCOUNT).trim(), // ✅ use the merchant account
+          merchantAccountNumber: "2031237",
           clientReference: "CAMP-" + Date.now(),
           customerEmail: email,
           customerMsisdn: phone // ✅ forward phone to Hubtel
