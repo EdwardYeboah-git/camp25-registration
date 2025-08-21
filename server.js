@@ -97,7 +97,7 @@ app.post('/register', async (req, res) => {
 
 // Create Hubtel Payment
 app.post("/hubtel/create-payment", async (req, res) => {
-    const { email, amount, phone } = req.body; // include phone
+    const { email, amount, phone } = req.body; 
   
     try {
       const response = await axios.post(
@@ -110,7 +110,7 @@ app.post("/hubtel/create-payment", async (req, res) => {
           merchantAccountNumber: "2031237",
           clientReference: "CAMP-" + Date.now(),
           customerEmail: email,
-          customerMsisdn: phone // ✅ forward phone to Hubtel
+          customerMsisdn: phone 
         },
         {
           headers: {
