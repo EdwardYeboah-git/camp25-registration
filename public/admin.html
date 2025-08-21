@@ -43,14 +43,18 @@
       e.preventDefault();
   
       const formData = new FormData(this);
+      let data = Object.fromEntries(formData.entries());
+  
+      // Normalize email
+      data.email = data.email.trim().toLowerCase();
   
       try {
         const response = await fetch('/admin/confirm-payment', { 
           method: 'POST',
-          body: formData
+          headers: { "Content-Type": "application/json" },
+          body: JSON.stringify(data)
         });
   
-        // If not logged in, redirect to login
         if (response.status === 401 || response.status === 403) {
           window.location.href = '/admin-login.html';
           return;
@@ -59,7 +63,6 @@
         const result = await response.json();
   
         if (response.ok) {
-          // Show success popup
           document.getElementById('admin-success-popup').classList.remove("d-none");
           setTimeout(() => {
             document.getElementById('admin-success-popup').classList.add("d-none");

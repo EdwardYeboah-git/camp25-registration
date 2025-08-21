@@ -342,9 +342,7 @@ app.get('/admin/download-excel', checkAdminAuth, async (req, res) => {
 // Confirm payment manually (bank transfer)
 app.post("/admin/confirm-payment", checkAdminAuth, async (req, res) => {
     try {
-      // Extract body whether it's JSON or FormData (urlencoded)
-      let email = req.body.email;
-      let reference = req.body.reference;
+      let { email, reference } = req.body;
   
       if (!email) {
         return res.status(400).json({ message: "Email is required" });
@@ -372,13 +370,13 @@ app.post("/admin/confirm-payment", checkAdminAuth, async (req, res) => {
   
       // Send receipt email
       await sendReceiptEmail(camper.email, reference, camper.amount);
-  
-      res.json({ message: "Payment confirmed" });
-    } catch (err) {
-      console.error("Manual confirmation error:", err);
-      res.status(500).json({ message: "Error confirming payment" });
-    }
-  });
+
+    res.json({ message: "Payment confirmed" });
+  } catch (err) {
+    console.error("Manual confirmation error:", err);
+    res.status(500).json({ message: "Error confirming payment" });
+  }
+});
 
 // ------------------ Helper Functions ------------------
 async function sendReceiptEmail(email, reference, amount) {

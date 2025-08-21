@@ -56,34 +56,37 @@
   let campersData = [];
 
   async function fetchCampers() {
-  const res = await fetch('/admin/campers');
-  if (res.status === 401 || res.status === 403) {
-    window.location.href = '/admin-login.html';
-    return;
+    const res = await fetch('/admin/campers');
+    if (res.status === 401 || res.status === 403) {
+      window.location.href = '/admin-login.html';
+      return;
+    }
+    campersData = await res.json();
+    renderTable(campersData);
   }
-  campersData = await res.json();
-  renderTable(campersData);
-}
 
   function renderTable(data) {
     const tbody = document.querySelector('#campersTable tbody');
-    tbody.innerHTML = data.map(c => `
-      <tr>
-        <td>${c.fullname}</td>
-        <td>${c.email}</td>
-        <td>${c.phone}</td>
-        <td>${c.pass_type}</td>
-        <td>${c.amount}</td>
-        <td class="${c.payment_status === 'paid' ? 'text-success fw-bold' : 'text-danger fw-bold'}">
-          ${c.payment_status}
-        </td>
-        <td>
-          ${c.payment_status !== 'paid' 
-            ? `<a href="/admin.html?email=${encodeURIComponent(c.email)}" class="btn btn-sm btn-primary">Confirm Payment</a>`
-            : `<span class="text-muted">✓ Confirmed</span>`}
-        </td>
-      </tr>
-    `).join('');
+    tbody.innerHTML = data.map(c => {
+      const cleanEmail = (c.email || "").trim().toLowerCase();
+      return `
+        <tr>
+          <td>${c.fullname}</td>
+          <td>${c.email}</td>
+          <td>${c.phone}</td>
+          <td>${c.pass_type}</td>
+          <td>${c.amount}</td>
+          <td class="${c.payment_status === 'paid' ? 'text-success fw-bold' : 'text-danger fw-bold'}">
+            ${c.payment_status}
+          </td>
+          <td>
+            ${c.payment_status !== 'paid' 
+              ? `<a href="/admin.html?email=${encodeURIComponent(cleanEmail)}" class="btn btn-sm btn-primary">Confirm Payment</a>`
+              : `<span class="text-muted">✓ Confirmed</span>`}
+          </td>
+        </tr>
+      `;
+    }).join('');
   }
 
   function applyFilters() {
