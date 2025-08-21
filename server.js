@@ -338,36 +338,47 @@ app.get('/admin/download-excel', checkAdminAuth, async (req, res) => {
 });
 
 // Confirm payment manually (bank transfer)
-app.post("/admin/confirm-payment", checkAdminAuth, bodyParser.urlencoded({ extended: true }), async (req, res) => {
-    const { email, reference } = req.body;
-
-    try {
+app.post(
+    "/admin/confirm-payment",
+    checkAdminAuth,
+    bodyParser.urlencoded({ extended: true }),
+    async (req, res) => {
+        let { email, reference } = req.body;
+        if (!reference || reference.trim() === "") {
+            reference = "Manual-Confirmation";
+        }
+  
+      try {
         const client = await pool.connect();
         const result = await client.query(
-            `UPDATE campers 
-             SET payment_status = $1 
-             WHERE email = $2 
-             RETURNING email, amount`,
-            ['paid', email]
+          `UPDATE campers 
+           SET payment_status = $1 
+           WHERE LOWER(TRIM(email)) = LOWER(TRIM($2)) 
+           RETURNING email, amount`,
+          ['paid', email]
         );
         client.release();
-
+  
         if (result.rowCount === 0) {
-            return res.status(404).json({ message: "Camper not found" });
+          return res.status(404).json({ message: "Camper not found" });
         }
-
-        // Camper details
+  
         const camper = result.rows[0];
-
+  
         // Send receipt email
-        await sendReceiptEmail(email, reference || "Manual-Confirmation", camper.amount);
-
+        await sendReceiptEmail(
+          camper.email,
+          reference || "Manual-Confirmation",
+          camper.amount
+        );
+  
         res.json({ message: "Payment confirmed" });
-    } catch (err) {
+      } catch (err) {
         console.error("Manual confirmation error:", err);
         res.status(500).json({ message: "Error confirming payment" });
+      }
     }
-});
+  );
 
 
 // ------------------ Helper Functions ------------------

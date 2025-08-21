@@ -16,7 +16,7 @@
       </div>
       <div class="mb-3">
         <label>Reference (Optional)</label>
-        <input type="text" name="reference" class="form-control">
+        <input type="text" name="reference" class="form-control" value="Manual-Confirmation">
       </div>
       <button type="submit" class="btn btn-success w-100">Confirm Payment</button>
     </form>
@@ -31,40 +31,49 @@
     </div>
   </div>
 
-<script>
-  // Prefill email if passed from dashboard
-  const urlParams = new URLSearchParams(window.location.search);
-  const emailFromUrl = urlParams.get("email");
-  if (emailFromUrl) {
-    document.getElementById("emailInput").value = emailFromUrl;
-  }
-
-  document.getElementById("confirmForm").addEventListener('submit', async function (e) {
-    e.preventDefault();
-    const formData = new FormData(this);
-
-    const response = await fetch('/admin/confirm-payment', { method: 'POST', body: formData });
-
-if (response.status === 401 || response.status === 403) {
-  window.location.href = '/admin-login.html';
-  return;
-}
-
-    const result = await response.json();
-
-    if (response.ok) {
-      document.getElementById('admin-success-popup').classList.remove("d-none");
-      setTimeout(() => {
-        document.getElementById('admin-success-popup').classList.add("d-none");
-        window.location.href = "/admin-dashboard.html";
-      }, 2000);
-    } else {
-      const msgDiv = document.getElementById("responseMsg");
-      msgDiv.textContent = result.message;
-      msgDiv.className = "alert alert-danger mt-3";
-      msgDiv.classList.remove("d-none");
+  <script>
+    // Prefill email if passed from dashboard
+    const urlParams = new URLSearchParams(window.location.search);
+    const emailFromUrl = urlParams.get("email");
+    if (emailFromUrl) {
+      document.getElementById("emailInput").value = emailFromUrl;
     }
-  });
-</script>
-</body>
-</html>
+  
+    document.getElementById("confirmForm").addEventListener('submit', async function (e) {
+      e.preventDefault();
+  
+      const formData = new FormData(this);
+      let data = Object.fromEntries(formData.entries());
+  
+      // Normalize email (trim + lowercase)
+      data.email = data.email.trim().toLowerCase();
+  
+      const response = await fetch('/admin/confirm-payment', { 
+        method: 'POST', 
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify(data)
+      });
+  
+      if (response.status === 401 || response.status === 403) {
+        window.location.href = '/admin-login.html';
+        return;
+      }
+  
+      const result = await response.json();
+  
+      if (response.ok) {
+        document.getElementById('admin-success-popup').classList.remove("d-none");
+        setTimeout(() => {
+          document.getElementById('admin-success-popup').classList.add("d-none");
+          window.location.href = "/admin-dashboard.html";
+        }, 2000);
+      } else {
+        const msgDiv = document.getElementById("responseMsg");
+        msgDiv.textContent = result.message;
+        msgDiv.className = "alert alert-danger mt-3";
+        msgDiv.classList.remove("d-none");
+      }
+    });
+  </script>
+  </body>
+  </html>
