@@ -114,9 +114,7 @@ app.post("/hubtel/create-payment", async (req, res) => {
         },
         {
           headers: {
-            Authorization: "Basic " + Buffer.from(
-              process.env.HUBTEL_CLIENT_ID + ":" + process.env.HUBTEL_CLIENT_SECRET
-            ).toString("base64"),
+            Authorization: "Basic RXh6a0x2azplOTlhYTE5YTYyNjg0NzhkYjQ2N2YwYmMzNzI4YTNkMQ==", 
             "Content-Type": "application/json"
           }
         }
