@@ -73,10 +73,13 @@ app.post('/register', async (req, res) => {
             html: `
                 <h2>Hello ${fullname},</h2>
                 <h3>Thank you for registering for REPLIB Youth Camp 2025.</h3>
-                <p>Your registration is confirmed. Just one more step — kindly make payment to complete your registration!</p>
+                <p>Your registration was successful and has been confirmed.</p>
                 <p>Your selected pass: <b>${passLabel}</b> | Amount: GHS ${amount}</p>
-                <p>We are excited to meet you!</p>
-                <p>God bless you,<br><b>REPLIB Youth Team</b></p>
+                <p>You will receive an E- receipt after completing payment of your registration. </p>
+                <p>Kindly present this receipt at our frontdesk upon arrival..</p>
+                <p>We are excited to have you join us for this unforgetable experience!</p>
+                <p>God richly bless you,${fullname}<br><b>REPLIB Youth Team</b></p>
+                <img src="https://camp25-registration.onrender.com//images/church-logo.png" alt="Signature" style="max-width:100px;">
             `
         });
 
