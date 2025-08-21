@@ -21,6 +21,8 @@ app.use(session({
     resave: false,
     saveUninitialized: true,
 }));
+app.use(express.json()); // For JSON
+app.use(express.urlencoded({ extended: true })); // For FormData / URL-encoded forms
 
 // ------------------ PostgreSQL Connection ------------------
 const pool = new Pool({
