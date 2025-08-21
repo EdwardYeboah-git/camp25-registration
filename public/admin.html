@@ -43,33 +43,38 @@
       e.preventDefault();
   
       const formData = new FormData(this);
-      let data = Object.fromEntries(formData.entries());
   
-      // Normalize email (trim + lowercase)
-      data.email = data.email.trim().toLowerCase();
+      try {
+        const response = await fetch('/admin/confirm-payment', { 
+          method: 'POST',
+          body: formData
+        });
   
-      const response = await fetch('/admin/confirm-payment', { 
-        method: 'POST', 
-        headers: { "Content-Type": "application/json" },
-        body: JSON.stringify(data)
-      });
+        // If not logged in, redirect to login
+        if (response.status === 401 || response.status === 403) {
+          window.location.href = '/admin-login.html';
+          return;
+        }
   
-      if (response.status === 401 || response.status === 403) {
-        window.location.href = '/admin-login.html';
-        return;
-      }
+        const result = await response.json();
   
-      const result = await response.json();
-  
-      if (response.ok) {
-        document.getElementById('admin-success-popup').classList.remove("d-none");
-        setTimeout(() => {
-          document.getElementById('admin-success-popup').classList.add("d-none");
-          window.location.href = "/admin-dashboard.html";
-        }, 2000);
-      } else {
+        if (response.ok) {
+          // Show success popup
+          document.getElementById('admin-success-popup').classList.remove("d-none");
+          setTimeout(() => {
+            document.getElementById('admin-success-popup').classList.add("d-none");
+            window.location.href = "/admin-dashboard.html";
+          }, 2000);
+        } else {
+          const msgDiv = document.getElementById("responseMsg");
+          msgDiv.textContent = result.message || "Error confirming payment.";
+          msgDiv.className = "alert alert-danger mt-3";
+          msgDiv.classList.remove("d-none");
+        }
+      } catch (err) {
+        console.error("Error confirming payment:", err);
         const msgDiv = document.getElementById("responseMsg");
-        msgDiv.textContent = result.message;
+        msgDiv.textContent = "Network or server error.";
         msgDiv.className = "alert alert-danger mt-3";
         msgDiv.classList.remove("d-none");
       }

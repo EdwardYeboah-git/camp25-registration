@@ -338,48 +338,45 @@ app.get('/admin/download-excel', checkAdminAuth, async (req, res) => {
 });
 
 // Confirm payment manually (bank transfer)
-app.post(
-    "/admin/confirm-payment",
-    checkAdminAuth,
-    bodyParser.urlencoded({ extended: true }),
-    async (req, res) => {
-        let { email, reference } = req.body;
-        if (!reference || reference.trim() === "") {
-            reference = "Manual-Confirmation";
-        }
+app.post("/admin/confirm-payment", checkAdminAuth, async (req, res) => {
+    try {
+      // Extract body whether it's JSON or FormData (urlencoded)
+      let email = req.body.email;
+      let reference = req.body.reference;
   
-      try {
-        const client = await pool.connect();
-        const result = await client.query(
-          `UPDATE campers 
-           SET payment_status = $1 
-           WHERE LOWER(TRIM(email)) = LOWER(TRIM($2)) 
-           RETURNING email, amount`,
-          ['paid', email]
-        );
-        client.release();
-  
-        if (result.rowCount === 0) {
-          return res.status(404).json({ message: "Camper not found" });
-        }
-  
-        const camper = result.rows[0];
-  
-        // Send receipt email
-        await sendReceiptEmail(
-          camper.email,
-          reference || "Manual-Confirmation",
-          camper.amount
-        );
-  
-        res.json({ message: "Payment confirmed" });
-      } catch (err) {
-        console.error("Manual confirmation error:", err);
-        res.status(500).json({ message: "Error confirming payment" });
+      if (!email) {
+        return res.status(400).json({ message: "Email is required" });
       }
+  
+      if (!reference || reference.trim() === "") {
+        reference = "Manual-Confirmation";
+      }
+  
+      const client = await pool.connect();
+      const result = await client.query(
+        `UPDATE campers 
+         SET payment_status = $1 
+         WHERE LOWER(TRIM(email)) = LOWER(TRIM($2)) 
+         RETURNING email, amount`,
+        ["paid", email.trim().toLowerCase()]
+      );
+      client.release();
+  
+      if (result.rowCount === 0) {
+        return res.status(404).json({ message: "Camper not found" });
+      }
+  
+      const camper = result.rows[0];
+  
+      // Send receipt email
+      await sendReceiptEmail(camper.email, reference, camper.amount);
+  
+      res.json({ message: "Payment confirmed" });
+    } catch (err) {
+      console.error("Manual confirmation error:", err);
+      res.status(500).json({ message: "Error confirming payment" });
     }
-  );
-
+  });
 
 // ------------------ Helper Functions ------------------
 async function sendReceiptEmail(email, reference, amount) {
