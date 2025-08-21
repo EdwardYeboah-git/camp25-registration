@@ -97,175 +97,254 @@ app.post('/register', async (req, res) => {
 
 // Create Hubtel Payment
 app.post("/hubtel/create-payment", async (req, res) => {
-    const { email, amount, phone } = req.body; 
-  
-    try {
-      const response = await axios.post(
-        "https://payproxyapi.hubtel.com/items/initiate",
-        {
-          totalAmount: amount,
-          description: "Youth Camp 2025 Registration",
-          callbackUrl: "https://camp25-registration.onrender.com/hubtel/callback",
-          returnUrl: "https://camp25-registration.onrender.com/payment-success.html",
-          merchantAccountNumber: "2031237",
-          clientReference: "CAMP-" + Date.now(),
-          customerEmail: email,
-          customerMsisdn: phone 
-        },
-        {
-          headers: {
-            Authorization: "Basic RXh6a0x2azplOTlhYTE5YTYyNjg0NzhkYjQ2N2YwYmMzNzI4YTNkMQ==", 
-            "Content-Type": "application/json"
-          }
-        }
-      );
-  
-      const { checkoutUrl, transactionId } = response.data.data;
-  
-      // Save transactionId to DB
-      const client = await pool.connect();
-      await client.query(
-        `UPDATE campers SET transaction_id = $1 WHERE email = $2`,
-        [transactionId, email]
-      );
-      client.release();
-  
-      res.json({ checkoutUrl });
-    } catch (err) {
-      console.error("Hubtel error:", err.response?.data || err.message);
-      res.status(500).json({ message: "Hubtel payment init failed" });
+  try {
+    let { email, amount, phone } = req.body;
+
+    if (!email || !amount) {
+      return res.status(400).json({ message: "Email and amount are required" });
     }
-  });
+
+    // Normalize phone
+    const normalizePhone = (phone) => {
+      if (!phone) return null;
+      let p = phone.trim().replace(/[\s-]/g, "");
+      if (p.startsWith("+")) p = p.slice(1);
+      if (p.startsWith("0") && p.length === 10) p = "233" + p.slice(1);
+      return p;
+    };
+    const msisdn = normalizePhone(phone);
+
+    // Build Authorization
+    const auth = "Basic " + Buffer.from(
+      process.env.HUBTEL_CLIENT_ID.trim() + ":" + process.env.HUBTEL_CLIENT_SECRET.trim()
+    ).toString("base64");
+
+    const payload = {
+      totalAmount: Number(amount),
+      description: "Youth Camp 2025 Registration",
+      callbackUrl: process.env.HUBTEL_CALLBACK_URL.trim(),
+      returnUrl: "https://camp25-registration.onrender.com/payment-success.html",
+      merchantAccountNumber: process.env.HUBTEL_MERCHANT_ACCOUNT.trim(),
+      clientReference: "CAMP-" + Date.now(),
+      customerEmail: email,
+      ...(msisdn ? { customerMsisdn: msisdn } : {})
+    };
+
+    const response = await axios.post(
+      "https://payproxyapi.hubtel.com/items/initiate",
+      payload,
+      {
+        headers: {
+          Authorization: auth,
+          "Content-Type": "application/json",
+          Accept: "application/json"
+        },
+        timeout: 20000
+      }
+    );
+
+    const { checkoutUrl, transactionId } = response.data.data;
+
+    // Save transactionId to DB
+    const client = await pool.connect();
+    await client.query(
+      `UPDATE campers SET transaction_id = $1 WHERE LOWER(TRIM(email)) = LOWER(TRIM($2))`,
+      [transactionId, email.trim().toLowerCase()]
+    );
+    client.release();
+
+    res.json({ checkoutUrl, transactionId });
+  } catch (err) {
+    console.error("Hubtel init error:", err.response?.status, err.response?.data || err.message);
+    res.status(500).json({
+      message: "Hubtel payment init failed",
+      hubtelStatus: err.response?.status || null,
+      hubtelError: err.response?.data || err.message
+    });
+  }
+});
 // Hubtel Callback
 app.post('/hubtel/callback', bodyParser.json(), async (req, res) => {
-    try {
-        const data = req.body;
-        console.log("Hubtel Callback Data:", data);
+  try {
+    const data = req.body;
+    console.log("🔔 Hubtel Callback Data:", data);
 
-        const transactionId = data.TransactionId;
-        if (!transactionId) {
-            console.error("No TransactionId in callback");
-            return res.sendStatus(400);
-        }
-
-        // ✅ Call Hubtel Transaction Status API
-        const verifyRes = await axios.get(
-            `https://payproxyapi.hubtel.com/items/${transactionId}/status`,
-            {
-                headers: {
-                    Authorization: "Basic " + Buffer.from(
-                        process.env.HUBTEL_CLIENT_ID + ":" + process.env.HUBTEL_CLIENT_SECRET
-                    ).toString("base64")
-                }
-            }
-        );
-
-        const statusData = verifyRes.data.data;
-        const status = statusData.status;  // Success, Failed, Cancelled
-        const amount = statusData.amount;
-        const reference = statusData.clientReference;
-        let email = statusData.customerEmail;
-        let phone = statusData.customerMsisdn;
-
-        const client = await pool.connect();
-
-        // fallback to phone if no email
-        if (!email && phone) {
-            const result = await client.query(
-                `SELECT email FROM campers WHERE phone = $1 LIMIT 1`,
-                [phone]
-            );
-            if (result.rows.length > 0) {
-                email = result.rows[0].email;
-            }
-        }
-
-        if (!email) {
-            console.error("No email/phone match found for transaction", transactionId);
-            client.release();
-            return res.sendStatus(400);
-        }
-
-        if (status === "Success") {
-            await client.query(
-                `UPDATE campers SET payment_status = $1 WHERE email = $2`,
-                ['paid', email]
-            );
-            await sendReceiptEmail(email, reference, amount);
-            client.release();
-            return res.redirect("https://camp25-registration.onrender.com/payment-success.html");
-        } else {
-            await client.query(
-                `UPDATE campers SET payment_status = $1 WHERE email = $2`,
-                ['failed', email]
-            );
-            client.release();
-            return res.redirect("https://camp25-registration.onrender.com/payment-failed.html");
-        }
-
-    } catch (err) {
-        console.error("Hubtel Callback Error:", err.response?.data || err.message);
-        res.sendStatus(500);
+    const transactionId = data.TransactionId;
+    if (!transactionId) {
+      console.error("❌ No TransactionId in callback");
+      return res.sendStatus(400);
     }
+
+    // Build Authorization header
+    const auth = "Basic " + Buffer.from(
+      process.env.HUBTEL_CLIENT_ID.trim() + ":" + process.env.HUBTEL_CLIENT_SECRET.trim()
+    ).toString("base64");
+
+    // Verify transaction status with Hubtel
+    const verifyRes = await axios.get(
+      `https://payproxyapi.hubtel.com/items/${transactionId}/status`,
+      {
+        headers: {
+          Authorization: auth,
+          "Content-Type": "application/json",
+          Accept: "application/json"
+        },
+        timeout: 20000
+      }
+    );
+
+    const statusData = verifyRes.data.data;
+    console.log("✅ Hubtel Verified Status:", statusData);
+
+    const status = statusData.status; // Success, Failed, Cancelled, Pending
+    const amount = statusData.amount;
+    const reference = statusData.clientReference;
+    let email = statusData.customerEmail;
+    let phone = statusData.customerMsisdn;
+
+    // Normalize phone number for consistency
+    const normalizePhone = (phone) => {
+      if (!phone) return null;
+      let p = phone.trim().replace(/[\s-]/g, "");
+      if (p.startsWith("+")) p = p.slice(1);
+      if (p.startsWith("0") && p.length === 10) p = "233" + p.slice(1);
+      return p;
+    };
+    const msisdn = normalizePhone(phone);
+
+    const client = await pool.connect();
+
+    // 🔄 If no email, try to fetch by phone
+    if (!email && msisdn) {
+      const result = await client.query(
+        `SELECT email FROM campers WHERE phone = $1 LIMIT 1`,
+        [msisdn]
+      );
+      if (result.rows.length > 0) {
+        email = result.rows[0].email;
+      }
+    }
+
+    if (!email) {
+      console.error("❌ No email/phone match found for transaction", transactionId);
+      client.release();
+      return res.sendStatus(400);
+    }
+
+    if (status === "Success") {
+      await client.query(
+        `UPDATE campers SET payment_status = $1 WHERE LOWER(TRIM(email)) = LOWER(TRIM($2))`,
+        ['paid', email.trim().toLowerCase()]
+      );
+      await sendReceiptEmail(email, reference, amount);
+
+      client.release();
+      return res.redirect("https://camp25-registration.onrender.com/payment-success.html");
+    } else {
+      await client.query(
+        `UPDATE campers SET payment_status = $1 WHERE LOWER(TRIM(email)) = LOWER(TRIM($2))`,
+        ['failed', email.trim().toLowerCase()]
+      );
+
+      client.release();
+      return res.redirect("https://camp25-registration.onrender.com/payment-failed.html");
+    }
+
+  } catch (err) {
+    console.error("❌ Hubtel Callback Error:", err.response?.data || err.message);
+    res.sendStatus(500);
+  }
 });
 
 // Check Hubtel Transaction Status + Auto Update DB
 app.get("/hubtel/check-status/:transactionId", async (req, res) => {
-    const { transactionId } = req.params;
-  
-    try {
-      const { data: raw } = await axios.get(
-        `https://payproxyapi.hubtel.com/items/${transactionId}/status`,
-        {
-          headers: {
-            Authorization: "Basic " + Buffer.from(
-              process.env.HUBTEL_CLIENT_ID + ":" + process.env.HUBTEL_CLIENT_SECRET
-            ).toString("base64"),
-            "Content-Type": "application/json"
-          }
-        }
-      );
-  
-      const d = raw?.data || {};
-      const status = d.status; // Success / Failed / Pending / Cancelled
-      const amount = d.amount;
-      const reference = d.clientReference;
-  
-      let email = d.customerEmail || d.customer?.email || null;
-      const msisdn = d.customerMsisdn || d.customer?.msisdn || null;
-  
-      const client = await pool.connect();
-  
-      // Try to resolve email by phone if missing
-      if (!email && msisdn) {
-        const q = await client.query(`SELECT email FROM campers WHERE phone = $1 LIMIT 1`, [msisdn]);
-        if (q.rows.length) email = q.rows[0].email;
-      }
-  
-      if (email) {
-        // Check current status to avoid duplicate receipts
-        const cur = await client.query(`SELECT payment_status, amount FROM campers WHERE email = $1 LIMIT 1`, [email]);
-        const currentStatus = cur.rows[0]?.payment_status;
-  
-        if (status === "Success") {
-          if (currentStatus !== 'paid') {
-            await client.query(`UPDATE campers SET payment_status = 'paid' WHERE email = $1`, [email]);
-            await sendReceiptEmail(email, reference, amount);
-          }
-        } else if (status === "Failed") {
-          await client.query(`UPDATE campers SET payment_status = 'failed' WHERE email = $1`, [email]);
-        }
-      }
-  
-      client.release();
-      res.json(raw);
-    } catch (err) {
-      console.error("Hubtel status check error:", err.response?.data || err.message);
-      res.status(500).json({ message: "Error checking transaction status" });
-    }
-  });
-// ------------------ Admin Routes ------------------
+  const { transactionId } = req.params;
 
+  try {
+    const auth = "Basic " + Buffer.from(
+      process.env.HUBTEL_CLIENT_ID.trim() + ":" + process.env.HUBTEL_CLIENT_SECRET.trim()
+    ).toString("base64");
+
+    const { data: raw } = await axios.get(
+      `https://payproxyapi.hubtel.com/items/${transactionId}/status`,
+      {
+        headers: {
+          Authorization: auth,
+          "Content-Type": "application/json",
+          Accept: "application/json"
+        },
+        timeout: 20000
+      }
+    );
+
+    const d = raw?.data || {};
+    console.log("🔎 Hubtel Status Check Response:", d);
+
+    const status = d.status; // Success / Failed / Pending / Cancelled
+    const amount = d.amount;
+    const reference = d.clientReference;
+
+    let email = d.customerEmail || d.customer?.email || null;
+    let phone = d.customerMsisdn || d.customer?.msisdn || null;
+
+    // Normalize phone
+    const normalizePhone = (phone) => {
+      if (!phone) return null;
+      let p = phone.trim().replace(/[\s-]/g, "");
+      if (p.startsWith("+")) p = p.slice(1);
+      if (p.startsWith("0") && p.length === 10) p = "233" + p.slice(1);
+      return p;
+    };
+    const msisdn = normalizePhone(phone);
+
+    const client = await pool.connect();
+
+    // 🔄 Try to resolve email by phone if missing
+    if (!email && msisdn) {
+      const q = await client.query(
+        `SELECT email FROM campers WHERE phone = $1 LIMIT 1`,
+        [msisdn]
+      );
+      if (q.rows.length) email = q.rows[0].email;
+    }
+
+    if (email) {
+      const normalizedEmail = email.trim().toLowerCase();
+
+      // Fetch current camper status
+      const cur = await client.query(
+        `SELECT payment_status, amount FROM campers WHERE LOWER(TRIM(email)) = LOWER(TRIM($1)) LIMIT 1`,
+        [normalizedEmail]
+      );
+      const currentStatus = cur.rows[0]?.payment_status;
+
+      if (status === "Success") {
+        if (currentStatus !== 'paid') {
+          await client.query(
+            `UPDATE campers SET payment_status = 'paid' WHERE LOWER(TRIM(email)) = LOWER(TRIM($1))`,
+            [normalizedEmail]
+          );
+          await sendReceiptEmail(normalizedEmail, reference, amount);
+        }
+      } else if (status === "Failed") {
+        await client.query(
+          `UPDATE campers SET payment_status = 'failed' WHERE LOWER(TRIM(email)) = LOWER(TRIM($1))`,
+          [normalizedEmail]
+        );
+      }
+    } else {
+      console.warn("⚠ No email or phone match for transaction:", transactionId);
+    }
+
+    client.release();
+    res.json(raw);
+  } catch (err) {
+    console.error("❌ Hubtel status check error:", err.response?.data || err.message);
+    res.status(500).json({ message: "Error checking transaction status" });
+  }
+});
+
+// ------------------ Admin Routes ------------------
 // Admin login
 app.post('/admin/login', (req, res) => {
     const { username, password } = req.body;
