@@ -113,21 +113,18 @@ app.post("/hubtel/create-payment", async (req, res) => {
       return p;
     };
     const msisdn = normalizePhone(phone);
+    console.log("Initiating Payment request")
+
 
     // Build Authorization
-    const auth = "Basic " + Buffer.from(
-      process.env.HUBTEL_CLIENT_ID.trim() + ":" + process.env.HUBTEL_CLIENT_SECRET.trim()
-    ).toString("base64");
-    console.log("Client_id:" + process.env.HUBTEL_CLIENT_ID)
-    console.log("Clinet_secret:" + process.env.HUBTEL_CLIENT_SECRET)
-    console.log("Merchant_Acc:" + process.env.HUBTEL_MERCHANT_ACCOUNT)
-
+    const auth = "Basic RXh6a0x2azplOTlhYTE5YTYyNjg0NzhkYjQ2N2YwYmMzNzI4YTNkMQ==";
+    
     const payload = {
-      totalAmount: Number(amount),
+      totalAmount: 0.10,
       description: "Youth Camp 2025 Registration",
       callbackUrl: process.env.HUBTEL_CALLBACK_URL.trim(),
       returnUrl: "https://camp25-registration.onrender.com/payment-success.html",
-      merchantAccountNumber: process.env.HUBTEL_MERCHANT_ACCOUNT.trim(),
+      merchantAccountNumber: "2031237",
       clientReference: "CAMP-" + Date.now(),
       customerEmail: email,
       ...(msisdn ? { customerMsisdn: msisdn } : {})
@@ -145,7 +142,7 @@ app.post("/hubtel/create-payment", async (req, res) => {
         timeout: 20000
       }
     );
-
+      console.log("Response: " + response)
     const { checkoutUrl, transactionId } = response.data.data;
 
     // Save transactionId to DB
