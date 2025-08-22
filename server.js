@@ -182,7 +182,7 @@ app.post('/hubtel/callback', bodyParser.json(), async (req, res) => {
 
     // Verify transaction status with Hubtel
     const verifyRes = await axios.get(
-      `https://payproxyapi.hubtel.com/items/${transactionId}/status`,
+      `https://api-txnstatus.hubtel.com/transactions/2031237/status?clientReference=${transactionId}`,
       {
         headers: {
           Authorization: auth,
