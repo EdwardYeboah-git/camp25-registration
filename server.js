@@ -118,6 +118,9 @@ app.post("/hubtel/create-payment", async (req, res) => {
     const auth = "Basic " + Buffer.from(
       process.env.HUBTEL_CLIENT_ID.trim() + ":" + process.env.HUBTEL_CLIENT_SECRET.trim()
     ).toString("base64");
+    console.log("Client_id:" + process.env.HUBTEL_CLIENT_ID)
+    console.log("Clinet_secret:" + process.env.HUBTEL_CLIENT_SECRET)
+    console.log("Merchant_Acc:" + process.env.HUBTEL_MERCHANT_ACCOUNT)
 
     const payload = {
       totalAmount: Number(amount),
