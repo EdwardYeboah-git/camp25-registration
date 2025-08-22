@@ -143,17 +143,17 @@ app.post("/hubtel/create-payment", async (req, res) => {
       }
     );
       console.log("Response: " + response)
-    const { checkoutUrl, transactionId } = response.data.data;
+    const { checkoutUrl, transactionId: clientReference } = response.data.data;
 
     // Save transactionId to DB
     const client = await pool.connect();
     await client.query(
       `UPDATE campers SET transaction_id = $1 WHERE LOWER(TRIM(email)) = LOWER(TRIM($2))`,
-      [transactionId, email.trim().toLowerCase()]
+      [clientReference, email.trim().toLowerCase()]
     );
     client.release();
 
-    res.json({ checkoutUrl, transactionId });
+    res.json({ checkoutUrl, transactionId: clientReference });
   } catch (err) {
     console.error("Hubtel init error:", err.response?.status, err.response?.data || err.message);
     res.status(500).json({
