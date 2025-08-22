@@ -120,7 +120,7 @@ app.post("/hubtel/create-payment", async (req, res) => {
     const auth = "Basic RXh6a0x2azplOTlhYTE5YTYyNjg0NzhkYjQ2N2YwYmMzNzI4YTNkMQ==";
     
     const payload = {
-      totalAmount: 0.10,
+      totalAmount: Number(amount),
       description: "Youth Camp 2025 Registration",
       callbackUrl: "https://camp25-registration.onrender.com/hubtel/callback",
       returnUrl: "https://camp25-registration.onrender.com/payment-success.html",
