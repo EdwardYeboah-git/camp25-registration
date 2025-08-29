@@ -176,10 +176,7 @@ app.post('/hubtel/callback', bodyParser.json(), async (req, res) => {
       return res.sendStatus(400);
     }
 
-    // Build Authorization header
-    const auth = "Basic " + Buffer.from(
-      process.env.HUBTEL_CLIENT_ID.trim() + ":" + process.env.HUBTEL_CLIENT_SECRET.trim()
-    ).toString("base64");
+    const auth = "Basic RXh6a0x2azplOTlhYTE5YTYyNjg0NzhkYjQ2N2YwYmMzNzI4YTNkMQ==" 
 
     // Verify transaction status with Hubtel
     const verifyRes = await axios.get(
@@ -258,16 +255,14 @@ app.post('/hubtel/callback', bodyParser.json(), async (req, res) => {
 });
 
 // Check Hubtel Transaction Status + Auto Update DB
-app.get("/hubtel/check-status/:transactionId", async (req, res) => {
-  const { transactionId } = req.params;
+app.get("/hubtel/check-status/:clientReference", async (req, res) => {
+  const { clientReference } = req.params;
 
   try {
-    const auth = "Basic " + Buffer.from(
-      process.env.HUBTEL_CLIENT_ID.trim() + ":" + process.env.HUBTEL_CLIENT_SECRET.trim()
-    ).toString("base64");
-
-    const { data: raw } = await axios.get(
-      `https://payproxyapi.hubtel.com/items/${transactionId}/status`,
+      const auth = "Basic RXh6a0x2azplOTlhYTE5YTYyNjg0NzhkYjQ2N2YwYmMzNzI4YTNkMQ==" 
+    
+      const { data: raw } = await axios.get(
+      `https://api-txnstatus.hubtel.com/transactions/2031237/status?clientReference=${transactionId}`,
       {
         headers: {
           Authorization: auth,
@@ -278,15 +273,39 @@ app.get("/hubtel/check-status/:transactionId", async (req, res) => {
       }
     );
 
-    const d = raw?.data || {};
+    // Extract response safely
+    const d = raw || {};
     console.log("🔎 Hubtel Status Check Response:", d);
 
-    const status = d.status; // Success / Failed / Pending / Cancelled
+    // Hubtel response fields
+    const status = d.status;       // Success / Failed / Pending / Cancelled
     const amount = d.amount;
     const reference = d.clientReference;
 
     let email = d.customerEmail || d.customer?.email || null;
     let phone = d.customerMsisdn || d.customer?.msisdn || null;
+
+    // Send parsed response
+    res.json({
+      success: true,
+      status,
+      amount,
+      reference,
+      customer: { email, phone },
+      rawResponse: d
+    });
+
+  } catch (error) {
+    console.error("❌ Error checking transaction status:", error.message);
+
+    res.status(500).json({
+      success: false,
+      message: "Could not fetch transaction status",
+      error: error.message
+    });
+  }
+});
+
 
     // Normalize phone
     const normalizePhone = (phone) => {
@@ -339,11 +358,7 @@ app.get("/hubtel/check-status/:transactionId", async (req, res) => {
 
     client.release();
     res.json(raw);
-  } catch (err) {
-    console.error("❌ Hubtel status check error:", err.response?.data || err.message);
-    res.status(500).json({ message: "Error checking transaction status" });
-  }
-});
+
 
 // ------------------ Admin Routes ------------------
 // Admin login
