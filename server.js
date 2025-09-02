@@ -253,16 +253,19 @@ app.post('/hubtel/callback', bodyParser.json(), async (req, res) => {
     res.sendStatus(500);
   }
 });
+ 
+  
 
 // Check Hubtel Transaction Status + Auto Update DB
-app.get("/hubtel/check-status/:clientReference", async (req, res) => {
-  const { clientReference } = req.params;
-
+app.get("/hubtel/check-status/:transactionId", async (req, res) => {
   try {
-      const auth = "Basic RXh6a0x2azplOTlhYTE5YTYyNjg0NzhkYjQ2N2YwYmMzNzI4YTNkMQ==" 
-    
-      const { data: raw } = await axios.get(
-      `https://api-txnstatus.hubtel.com/transactions/2031237/status?clientReference=${transactionId}`,
+    const { clientReference } = req.params;
+
+    const auth = "Basic RXh6a0x2azplOTlhYTE5YTYyNjg0NzhkYjQ2N2YwYmMzNzI4YTNkMQ==" 
+
+    // 🔍 Call Hubtel API
+    const { data: raw } = await axios.get(
+      `https://api-txnstatus.hubtel.com/transactions/2031237/status?clientReference=${clientReference}`,
       {
         headers: {
           Authorization: auth,
@@ -273,41 +276,17 @@ app.get("/hubtel/check-status/:clientReference", async (req, res) => {
       }
     );
 
-    // Extract response safely
-    const d = raw || {};
+    const d = raw?.data || {};
     console.log("🔎 Hubtel Status Check Response:", d);
 
-    // Hubtel response fields
-    const status = d.status;       // Success / Failed / Pending / Cancelled
+    const status = d.status; // Success / Failed / Pending / Cancelled
     const amount = d.amount;
     const reference = d.clientReference;
 
     let email = d.customerEmail || d.customer?.email || null;
     let phone = d.customerMsisdn || d.customer?.msisdn || null;
 
-    // Send parsed response
-    res.json({
-      success: true,
-      status,
-      amount,
-      reference,
-      customer: { email, phone },
-      rawResponse: d
-    });
-
-  } catch (error) {
-    console.error("❌ Error checking transaction status:", error.message);
-
-    res.status(500).json({
-      success: false,
-      message: "Could not fetch transaction status",
-      error: error.message
-    });
-  }
-});
-
-
-    // Normalize phone
+    // ✅ Normalize phone number
     const normalizePhone = (phone) => {
       if (!phone) return null;
       let p = phone.trim().replace(/[\s-]/g, "");
@@ -317,13 +296,9 @@ app.get("/hubtel/check-status/:clientReference", async (req, res) => {
     };
     const msisdn = normalizePhone(phone);
 
-    (async () => {
-      const client = await pool.connect();
-      console.log("✅ Database connected");
-      client.release();
-    })();
-    
-    // 🔄 Try to resolve email by phone if missing
+    const client = await pool.connect();
+
+    // 🔄 If no email, try resolving by phone
     if (!email && msisdn) {
       const q = await client.query(
         `SELECT email FROM campers WHERE phone = $1 LIMIT 1`,
@@ -334,6 +309,40 @@ app.get("/hubtel/check-status/:clientReference", async (req, res) => {
 
     if (email) {
       const normalizedEmail = email.trim().toLowerCase();
+
+      const cur = await client.query(
+        `SELECT payment_status, amount FROM campers WHERE LOWER(TRIM(email)) = LOWER(TRIM($1)) LIMIT 1`,
+        [normalizedEmail]
+      );
+
+      const currentStatus = cur.rows[0]?.payment_status;
+
+      if (status === "Success") {
+        if (currentStatus !== "paid") {
+          await client.query(
+            `UPDATE campers SET payment_status = 'paid' WHERE LOWER(TRIM(email)) = LOWER(TRIM($1))`,
+            [normalizedEmail]
+          );
+          await sendReceiptEmail(normalizedEmail, reference, amount);
+        }
+      } else if (status === "Failed") {
+        await client.query(
+          `UPDATE campers SET payment_status = 'failed' WHERE LOWER(TRIM(email)) = LOWER(TRIM($1))`,
+          [normalizedEmail]
+        );
+      }
+    } else {
+      console.warn("⚠ No email or phone match for transaction:", transactionId);
+    }
+
+    client.release();
+    res.json(raw);
+
+  } catch (err) {
+    console.error("❌ Hubtel status check error:", err.response?.data || err.message);
+    res.status(500).json({ message: "Error checking transaction status" });
+  }
+});
 
       // Fetch current camper status
       const cur = await client.query(
@@ -356,7 +365,7 @@ app.get("/hubtel/check-status/:clientReference", async (req, res) => {
           [normalizedEmail]
         );
       }
-    } else {
+     else {
       console.warn("⚠ No email or phone match for transaction:", transactionId);
     }
 
