@@ -144,7 +144,7 @@ app.post("/hubtel/create-payment", async (req, res) => {
       }
     );
       console.log("Response: " + response)
-    const { checkoutUrl, transactionId: clientReference } = response.data.data;
+    const { checkoutUrl, clientReference } = response.data.data;
 
     // Save transactionId to DB
     const client = await pool.connect();
@@ -154,7 +154,7 @@ app.post("/hubtel/create-payment", async (req, res) => {
     );
     client.release();
 
-    res.json({ checkoutUrl, transactionId: clientReference });
+    res.json({ checkoutUrl, clientReference });
   } catch (err) {
     console.error("Hubtel init error:", err.response?.status, err.response?.data || err.message);
     res.status(500).json({
@@ -180,7 +180,7 @@ app.post('/hubtel/callback', bodyParser.json(), async (req, res) => {
 
     // Verify transaction status with Hubtel
     const verifyRes = await axios.get(
-      `https://api-txnstatus.hubtel.com/transactions/2031237/status?clientReference=${transactionId}`,
+      `https://api-txnstatus.hubtel.com/transactions/2031237/status?clientReference=${clientReference}`,
       {
         headers: {
           Authorization: auth,
@@ -317,7 +317,6 @@ app.get("/hubtel/check-status/:clientReference", async (req, res) => {
     };
     const msisdn = normalizePhone(phone);
 
-    const client = await pool.connect();
 
     // 🔄 Try to resolve email by phone if missing
     if (!email && msisdn) {
