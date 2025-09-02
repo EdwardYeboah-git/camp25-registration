@@ -317,7 +317,12 @@ app.get("/hubtel/check-status/:clientReference", async (req, res) => {
     };
     const msisdn = normalizePhone(phone);
 
-
+    (async () => {
+      const client = await pool.connect();
+      console.log("✅ Database connected");
+      client.release();
+    })();
+    
     // 🔄 Try to resolve email by phone if missing
     if (!email && msisdn) {
       const q = await client.query(
