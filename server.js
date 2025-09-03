@@ -152,7 +152,7 @@ app.post("/hubtel/create-payment", async (req, res) => {
       }
     );
       console.log("Response: " + response)
-    const { checkoutUrl, clientReference } = response.data.data;
+    const { checkoutUrl } = response.data.data;
 
     // Save clientReference to DB
     const client = await pool.connect();
@@ -172,12 +172,16 @@ app.post("/hubtel/create-payment", async (req, res) => {
     });
   }
 });
+
 // Hubtel Callback
 app.post('/hubtel/callback', bodyParser.json(), async (req, res) => {
   try {
-    const data = req.body;
-    console.log("🔔 Hubtel Callback Data:", data);
+    console.log("🔔 Hubtel Callback HIT!");   // ✅ Confirm Hubtel reached your server
+    console.log("📦 Raw Callback Headers:", req.headers);
+    console.log("📨 Raw Callback Body:", req.body);
 
+    const data = req.body;
+    
     const clientReference = data.ClientReference;
     if (!clientReference) {
       console.error("❌ No ClientReference in callback");
