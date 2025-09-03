@@ -257,7 +257,7 @@ app.post('/hubtel/callback', bodyParser.json(), async (req, res) => {
   
 
 // Check Hubtel Transaction Status + Auto Update DB
-app.get("/hubtel/check-status/:transactionId", async (req, res) => {
+app.get("/hubtel/check-status/:clientReference", async (req, res) => {
   try {
     const { clientReference } = req.params;
 
@@ -343,34 +343,6 @@ app.get("/hubtel/check-status/:transactionId", async (req, res) => {
     res.status(500).json({ message: "Error checking transaction status" });
   }
 });
-
-      // Fetch current camper status
-      const cur = await client.query(
-        `SELECT payment_status, amount FROM campers WHERE LOWER(TRIM(email)) = LOWER(TRIM($1)) LIMIT 1`,
-        [normalizedEmail]
-      );
-      const currentStatus = cur.rows[0]?.payment_status;
-
-      if (status === "Success") {
-        if (currentStatus !== 'paid') {
-          await client.query(
-            `UPDATE campers SET payment_status = 'paid' WHERE LOWER(TRIM(email)) = LOWER(TRIM($1))`,
-            [normalizedEmail]
-          );
-          await sendReceiptEmail(normalizedEmail, reference, amount);
-        }
-      } else if (status === "Failed") {
-        await client.query(
-          `UPDATE campers SET payment_status = 'failed' WHERE LOWER(TRIM(email)) = LOWER(TRIM($1))`,
-          [normalizedEmail]
-        );
-      }
-     else {
-      console.warn("⚠ No email or phone match for transaction:", transactionId);
-    }
-
-    client.release();
-    res.json(raw);
 
 
 // ------------------ Admin Routes ------------------
