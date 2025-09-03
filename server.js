@@ -21,16 +21,16 @@ const pool = new Pool({
   connectionString: process.env.DATABASE_URL,
   ssl: process.env.DATABASE_URL.includes("render") ? { rejectUnauthorized: false } : false
 });
-
 app.use(session({
-store: new pgSession({ pool, tableName: 'session' }),
-secret: process.env.SESSION_SECRET || 'campSecretKey',
-resave: false,
-saveUninitialized: false,
-cookie: {
-    secure: process.env.NODE_ENV === 'production',
-    maxAge: 1000 * 60 * 60 * 24 * 7
-}
+  store: new pgSession({ pool, tableName: 'session' }),
+  secret: process.env.SESSION_SECRET || 'campSecretKey',
+  resave: false,
+  saveUninitialized: false,
+  cookie: {
+    secure: process.env.NODE_ENV === 'production', 
+    sameSite: "lax",                               
+    maxAge: 1000 * 60 * 60 * 24 * 7                
+  }
 }));
 app.use(express.json()); // For JSON
 app.use(express.urlencoded({ extended: true })); // For FormData / URL-encoded forms
