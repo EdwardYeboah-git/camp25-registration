@@ -5,6 +5,7 @@ const bodyParser = require('body-parser');
 const nodemailer = require('nodemailer');
 const { Pool } = require('pg');
 const session = require('express-session');
+const pgSession = require('connect-pg-simple')(session)
 const PDFDocument = require('pdfkit');
 const fs = require('fs');
 const ExcelJS = require('exceljs');
@@ -16,19 +17,24 @@ const app = express();
 app.use(bodyParser.json());
 app.use(bodyParser.urlencoded({ extended: true }));
 app.use(express.static(path.join(__dirname, 'public')));
+const pool = new Pool({
+  connectionString: process.env.DATABASE_URL,
+  ssl: process.env.DATABASE_URL.includes("render") ? { rejectUnauthorized: false } : false
+});
+
 app.use(session({
-    secret: 'campSecretKey',
-    resave: false,
-    saveUninitialized: true,
+store: new pgSession({ pool, tableName: 'session' }),
+secret: process.env.SESSION_SECRET || 'campSecretKey',
+resave: false,
+saveUninitialized: false,
+cookie: {
+    secure: process.env.NODE_ENV === 'production',
+    maxAge: 1000 * 60 * 60 * 24 * 7
+}
 }));
 app.use(express.json()); // For JSON
 app.use(express.urlencoded({ extended: true })); // For FormData / URL-encoded forms
 
-// ------------------ PostgreSQL Connection ------------------
-const pool = new Pool({
-    connectionString: process.env.DATABASE_URL,
-    ssl: process.env.DATABASE_URL.includes("render") ? { rejectUnauthorized: false } : false
-});
 
 // ------------------ Nodemailer Transporter ------------------
 const transporter = nodemailer.createTransport({
@@ -116,9 +122,11 @@ app.post("/hubtel/create-payment", async (req, res) => {
     console.log("Initiating Payment request")
 
 
-    // Build Authorization
+    // Build Authorization  
     const auth = "Basic RXh6a0x2azplOTlhYTE5YTYyNjg0NzhkYjQ2N2YwYmMzNzI4YTNkMQ==";
     
+    const clientReference = "CAMP-" + Date.now();
+
     const payload = {
       totalAmount: 0.1,
       description: "Youth Camp 2025 Registration",
@@ -126,7 +134,7 @@ app.post("/hubtel/create-payment", async (req, res) => {
       returnUrl: "https://camp25-registration.onrender.com/payment-success.html",
       merchantAccountNumber: "2031237",
       cancellationUrl: "https://camp25-registration.onrender.com/payment-cancelled.html",
-      clientReference: "CAMP-" + Date.now(),
+      clientReference,
       customerEmail: email,
       ...(msisdn ? { customerMsisdn: msisdn } : {})
     };
@@ -146,7 +154,7 @@ app.post("/hubtel/create-payment", async (req, res) => {
       console.log("Response: " + response)
     const { checkoutUrl, clientReference } = response.data.data;
 
-    // Save transactionId to DB
+    // Save clientReference to DB
     const client = await pool.connect();
     await client.query(
       `UPDATE campers SET transaction_id = $1 WHERE LOWER(TRIM(email)) = LOWER(TRIM($2))`,
@@ -170,9 +178,9 @@ app.post('/hubtel/callback', bodyParser.json(), async (req, res) => {
     const data = req.body;
     console.log("🔔 Hubtel Callback Data:", data);
 
-    const transactionId = data.TransactionId;
-    if (!transactionId) {
-      console.error("❌ No TransactionId in callback");
+    const clientReference = data.ClientReference;
+    if (!clientReference) {
+      console.error("❌ No ClientReference in callback");
       return res.sendStatus(400);
     }
 
@@ -224,7 +232,7 @@ app.post('/hubtel/callback', bodyParser.json(), async (req, res) => {
     }
 
     if (!email) {
-      console.error("❌ No email/phone match found for transaction", transactionId);
+      console.error("❌ No email/phone match found for transaction", clientReference);
       client.release();
       return res.sendStatus(400);
     }
@@ -332,7 +340,7 @@ app.get("/hubtel/check-status/:clientReference", async (req, res) => {
         );
       }
     } else {
-      console.warn("⚠ No email or phone match for transaction:", transactionId);
+      console.warn("⚠ No email or phone match for transaction:", clientReference);
     }
 
     client.release();
@@ -343,7 +351,6 @@ app.get("/hubtel/check-status/:clientReference", async (req, res) => {
     res.status(500).json({ message: "Error checking transaction status" });
   }
 });
-
 
 // ------------------ Admin Routes ------------------
 // Admin login
@@ -481,6 +488,13 @@ async function sendReceiptEmail(email, reference, amount) {
 
     fs.unlinkSync(receiptPath);
 }
+
+// ------------------ Test Endpoint ------------------
+app.post("/ping", (req, res) => {
+  console.log("✅ /ping POST request received:", req.body);
+  res.json({ message: "Ping received!", data: req.body });
+});
+
 
 // ------------------ Start Server ------------------
 const PORT = process.env.PORT || 10000;
