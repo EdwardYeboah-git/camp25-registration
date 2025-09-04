@@ -21,15 +21,17 @@ const pool = new Pool({
   connectionString: process.env.DATABASE_URL,
   ssl: process.env.DATABASE_URL.includes("render") ? { rejectUnauthorized: false } : false
 });
+app.set('trust proxy', 1); 
 app.use(session({
   store: new pgSession({ pool, tableName: 'session' }),
   secret: process.env.SESSION_SECRET || 'campSecretKey',
   resave: false,
   saveUninitialized: false,
   cookie: {
-    secure: process.env.NODE_ENV === 'production', 
-    sameSite: "lax",                               
-    maxAge: 1000 * 60 * 60 * 24 * 7                
+    secure: process.env.NODE_ENV === 'production', // ✅ HTTPS only in prod
+    httpOnly: true,
+    sameSite: process.env.NODE_ENV === 'production' ? "none" : "lax", // ✅ allow cross-site cookies
+    maxAge: 1000 * 60 * 60 * 24 * 7
   }
 }));
 app.use(express.json()); // For JSON
