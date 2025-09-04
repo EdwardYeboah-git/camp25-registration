@@ -393,6 +393,18 @@ app.get('/admin/campers', checkAdminAuth, async (req, res) => {
     }
 });
 
+// Automatic Recheck after 5mins
+ app.get("/admin/recheck/:clientReference", checkAdminAuth, async (req, res) => {
+  const { clientReference } = req.params;
+  const result = await checkHubtelTransactionStatus(clientReference);
+
+  if (!result) {
+    return res.status(500).json({ message: "Error checking transaction status" });
+ }
+
+  res.json({ message: "Transaction rechecked", result });
+});
+
 // Download campers as Excel
 app.get('/admin/download-excel', checkAdminAuth, async (req, res) => {
     try {
@@ -494,6 +506,86 @@ async function sendReceiptEmail(email, reference, amount) {
 
     fs.unlinkSync(receiptPath);
 }
+
+async function checkHubtelTransactionStatus(clientReference) {
+  try {
+    const auth = "Basic RXh6a0x2azplOTlhYTE5YTYyNjg0NzhkYjQ2N2YwYmMzNzI4YTNkMQ=="; 
+    
+    const { data: raw } = await axios.get(
+      `https://api-txnstatus.hubtel.com/transactions/2031237/status?clientReference=${clientReference}`,
+      {
+        headers: {
+          Authorization: auth,
+          "Content-Type": "application/json",
+          Accept: "application/json"
+        },
+        timeout: 20000
+      }
+    );
+
+    const d = raw?.data || {};
+    console.log("🔍 Transaction Status Check:", d);
+
+    if (!d.clientReference) return null;
+
+    const status = d.status;
+    const amount = d.amount;
+    const email = d.customerEmail;
+    const reference = d.clientReference;
+
+    const client = await pool.connect();
+
+    if (email) {
+      if (status === "Success") {
+        await client.query(
+          `UPDATE campers SET payment_status = 'paid' WHERE LOWER(TRIM(email)) = LOWER(TRIM($1))`,
+          [email.trim().toLowerCase()]
+        );
+        await sendReceiptEmail(email, reference, amount);
+      } else if (status === "Failed") {
+        await client.query(
+          `UPDATE campers SET payment_status = 'failed' WHERE LOWER(TRIM(email)) = LOWER(TRIM($1))`,
+          [email.trim().toLowerCase()]
+        );
+      }
+    }
+
+    client.release();
+    return d;
+
+  } catch (err) {
+    console.error("❌ Hubtel Transaction Status Error:", err.response?.data || err.message);
+    return null;
+  }
+}
+
+// ------------------ Auto Recheck Pending Transactions ------------------
+setInterval(async () => {
+  try {
+    console.log("⏳ Running auto transaction status recheck...");
+
+    const client = await pool.connect();
+    const { rows } = await client.query(
+      `SELECT transaction_id FROM campers 
+       WHERE payment_status = 'pending' 
+       AND transaction_id IS NOT NULL`
+    );
+    client.release();
+
+    if (rows.length === 0) {
+      console.log("✅ No pending transactions to recheck.");
+      return;
+    }
+
+    for (const row of rows) {
+      console.log(`🔎 Rechecking transaction: ${row.transaction_id}`);
+      await checkHubtelTransactionStatus(row.transaction_id);
+    }
+  } catch (err) {
+    console.error("❌ Auto recheck error:", err.message);
+  }
+}, 5 * 60 * 1000); // every 5 minutes
+
 
 // ------------------ Test Endpoint ------------------
 app.post("/ping", (req, res) => {
