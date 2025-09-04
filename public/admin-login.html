@@ -42,8 +42,8 @@ document.getElementById("loginForm").addEventListener("submit", async function(e
     msgDiv.classList.add("alert", res.ok ? "alert-success" : "alert-danger");
 
     if (res.ok) {
-        setTimeout(() => window.location.href = "/admin-dashboard.html", 1000);
-    }
+  window.location.href = "/admin-dashboard.html";
+}
 });
 </script>
 </body>
