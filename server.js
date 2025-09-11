@@ -561,16 +561,16 @@ async function checkHubtelTransactionStatus(clientReference) {
 
 // ------------------ Auto Recheck Pending Transactions ------------------
 setInterval(async () => {
+  let client;
   try {
     console.log("⏳ Running auto transaction status recheck...");
 
-    const client = await pool.connect();
+    client = await pool.connect();
     const { rows } = await client.query(
       `SELECT transaction_id FROM campers 
        WHERE payment_status = 'pending' 
        AND transaction_id IS NOT NULL`
     );
-    client.release();
 
     if (rows.length === 0) {
       console.log("✅ No pending transactions to recheck.");
@@ -583,8 +583,10 @@ setInterval(async () => {
     }
   } catch (err) {
     console.error("❌ Auto recheck error:", err.message);
+  } finally {
+    if (client) client.release();
   }
-}, 5 * 60 * 1000); // every 5 minutes
+}, 5 * 60 * 1000);
 
 
 // ------------------ Test Endpoint ------------------

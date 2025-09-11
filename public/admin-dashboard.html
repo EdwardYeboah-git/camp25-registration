@@ -6,115 +6,109 @@
   <title>Admin Dashboard</title>
   <link href="https://cdn.jsdelivr.net/npm/bootstrap@5.3.0/dist/css/bootstrap.min.css" rel="stylesheet">
 </head>
-<body class="container py-4">
-
-  <div class="d-flex justify-content-between align-items-center mb-3">
-    <h2>Admin Dashboard</h2>
-    <button id="downloadExcel" class="btn btn-success">⬇ Download Excel</button>
-  </div>
-
-  <!-- Filters -->
-  <div class="row mb-3">
-    <div class="col-md-4">
-      <input type="text" id="searchInput" class="form-control" placeholder="Search by name or email">
+<body class="bg-light">
+  <div class="container mt-5">
+    <h2 class="mb-4">Admin Dashboard</h2>
+    <div class="d-flex justify-content-end mb-3">
+      <button id="downloadExcel" class="btn btn-success">Download Excel</button>
     </div>
-    <div class="col-md-3">
-      <select id="statusFilter" class="form-select">
-        <option value="">All Status</option>
-        <option value="paid">Paid</option>
-        <option value="pending">Pending</option>
-      </select>
-    </div>
-    <div class="col-md-3">
-        <select id="passFilter" class="form-select">
-            <option value="">All Pass Types</option>
-            <option value="General Pass">General Pass</option>
-            <option value="Team Pass">Team Pass</option>
-          </select>
-    </div>
-  </div>
-
-  <!-- Table -->
-  <div class="table-responsive">
-    <table class="table table-bordered table-hover" id="campersTable">
+    <table class="table table-bordered table-hover">
       <thead class="table-dark">
         <tr>
-          <th>Name</th>
+          <th>Full Name</th>
           <th>Email</th>
           <th>Phone</th>
           <th>Pass Type</th>
           <th>Amount</th>
-          <th>Status</th>
+          <th>Payment Status</th>
+          <th>Age</th>
+          <th>Gender</th>
+          <th>Church</th>
           <th>Action</th>
         </tr>
       </thead>
-      <tbody></tbody>
+      <tbody id="campersTable"></tbody>
     </table>
   </div>
 
-<script>
-  let campersData = [];
+  <script>
+    async function fetchCampers() {
+      try {
+        const res = await fetch('/admin/campers');
+        if (!res.ok) {
+          alert("Session expired. Please login again.");
+          window.location.href = "/admin-login.html";
+          return;
+        }
+        const campers = await res.json();
+        const tbody = document.getElementById("campersTable");
+        tbody.innerHTML = "";
 
-  async function fetchCampers() {
-    const res = await fetch('/admin/campers');
-    if (res.status === 401 || res.status === 403) {
-      window.location.href = '/admin-login.html';
-      return;
+        campers.forEach(camper => {
+          const row = document.createElement("tr");
+          row.innerHTML = `
+            <td>${camper.fullname}</td>
+            <td>${camper.email}</td>
+            <td>${camper.phone}</td>
+            <td>${camper.pass_type}</td>
+            <td>GHS ${camper.amount}</td>
+            <td>
+              <span class="badge ${camper.payment_status === 'paid' ? 'bg-success' : camper.payment_status === 'pending' ? 'bg-warning text-dark' : 'bg-danger'}">
+                ${camper.payment_status}
+              </span>
+            </td>
+            <td>${camper.age || ''}</td>
+            <td>${camper.gender || ''}</td>
+            <td>${camper.church || ''}</td>
+            <td>
+              ${camper.payment_status !== 'paid' ? `
+                <button class="btn btn-sm btn-primary confirmBtn" data-email="${camper.email}">Confirm Payment</button>
+              ` : `<span class="text-success">✔ Confirmed</span>`}
+            </td>
+          `;
+          tbody.appendChild(row);
+        });
+
+        // Attach event listeners for Confirm Payment buttons
+        document.querySelectorAll(".confirmBtn").forEach(btn => {
+          btn.addEventListener("click", async () => {
+            const email = btn.getAttribute("data-email");
+            btn.disabled = true;
+            btn.textContent = "Confirming…";
+
+            try {
+              const res = await fetch("/admin/confirm-payment", {
+                method: "POST",
+                headers: { "Content-Type": "application/json" },
+                body: JSON.stringify({ email })
+              });
+
+              if (res.ok) {
+                btn.classList.remove("btn-primary");
+                btn.classList.add("btn-success");
+                btn.textContent = "✔ Confirmed";
+              } else {
+                btn.disabled = false;
+                btn.textContent = "Confirm Payment";
+                alert("Failed to confirm payment. Try again.");
+              }
+            } catch (err) {
+              btn.disabled = false;
+              btn.textContent = "Confirm Payment";
+              alert("Error: " + err.message);
+            }
+          });
+        });
+      } catch (err) {
+        console.error("Error fetching campers:", err);
+      }
     }
-    campersData = await res.json();
-    renderTable(campersData);
-  }
 
-  function renderTable(data) {
-    const tbody = document.querySelector('#campersTable tbody');
-    tbody.innerHTML = data.map(c => {
-      const cleanEmail = (c.email || "").trim().toLowerCase();
-      return `
-        <tr>
-          <td>${c.fullname}</td>
-          <td>${c.email}</td>
-          <td>${c.phone}</td>
-          <td>${c.pass_type}</td>
-          <td>${c.amount}</td>
-          <td class="${c.payment_status === 'paid' ? 'text-success fw-bold' : 'text-danger fw-bold'}">
-            ${c.payment_status}
-          </td>
-          <td>
-            ${c.payment_status !== 'paid' 
-              ? `<a href="/admin.html?email=${encodeURIComponent(cleanEmail)}" class="btn btn-sm btn-primary">Confirm Payment</a>`
-              : `<span class="text-muted">✓ Confirmed</span>`}
-          </td>
-        </tr>
-      `;
-    }).join('');
-  }
-
-  function applyFilters() {
-    const searchValue = document.getElementById('searchInput').value.toLowerCase();
-    const statusValue = document.getElementById('statusFilter').value;
-    const passValue = document.getElementById('passFilter').value;
-
-    let filtered = campersData.filter(c => {
-      const matchesSearch = c.fullname.toLowerCase().includes(searchValue) ||
-                            c.email.toLowerCase().includes(searchValue);
-      const matchesStatus = !statusValue || c.payment_status === statusValue;
-      const matchesPass = !passValue || c.pass_type === passValue;
-
-      return matchesSearch && matchesStatus && matchesPass;
+    document.getElementById("downloadExcel").addEventListener("click", () => {
+      window.location.href = "/admin/download-excel";
     });
 
-    renderTable(filtered);
-  }
-
-  document.getElementById('searchInput').addEventListener('input', applyFilters);
-  document.getElementById('statusFilter').addEventListener('change', applyFilters);
-  document.getElementById('passFilter').addEventListener('change', applyFilters);
-
-  document.getElementById("downloadExcel").addEventListener("click", () => {
-    window.location.href = '/admin/download-excel';
-  });
-
-  fetchCampers();
-</script>
+    fetchCampers();
+  </script>
 </body>
 </html>
