@@ -42,8 +42,9 @@ app.use(session({
   resave: false,
   saveUninitialized: false,
   cookie: {
-    secure: process.env.NODE_ENV === process.env.NODE_ENV === 'production', // ✅ HTTPS only in prod
-    sameSite: process.env.NODE_ENV === 'production' ? "none" : "lax", // ✅ allow cross-site cookies
+    secure: process.env.NODE_ENV === 'production', // ✅ HTTPS only in prod
+    httpOnly: true,
+    sameSite:  "lax", // ✅ allow cross-site cookies
     maxAge: 1000 * 60 * 60 * 24 * 7
   }
 }));
@@ -374,13 +375,13 @@ app.get("/hubtel/check-status/:clientReference", async (req, res) => {
 // ------------------ Admin Routes ------------------
 // Admin login
 app.post('/admin/login', (req, res) => {
-    const { username, password } = req.body;
+  const { username, password } = req.body;
 
-    if (username === process.env.ADMIN_USER && password === process.env.ADMIN_PASS) {
-        req.session.admin = true;
-        return res.json({ message: "Login successful" });
-    }
-    res.status(401).json({ message: "Invalid credentials" });
+  if (username === process.env.ADMIN_USER && password === process.env.ADMIN_PASS) {
+      req.session.admin = true;
+      return res.json({ message: "Login successful" });
+  }
+  res.status(401).json({ message: "Invalid credentials" });
 });
 
 // Middleware for admin authentication
