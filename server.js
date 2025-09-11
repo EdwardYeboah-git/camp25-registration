@@ -17,19 +17,32 @@ const app = express();
 app.use(bodyParser.json());
 app.use(bodyParser.urlencoded({ extended: true }));
 app.use(express.static(path.join(__dirname, 'public')));
+
 const pool = new Pool({
   connectionString: process.env.DATABASE_URL,
-  ssl: process.env.DATABASE_URL.includes("render") ? { rejectUnauthorized: false } : false
+  ssl: { rejectUnauthorized: false },
+  max: 5,                    
+  idleTimeoutMillis: 30000,  
+  keepAlive: true            
 });
+
+pool.on('error', (err) => {
+  console.error('Unexpected DB error:', err);
+});
+
 app.set('trust proxy', 1); 
+
 app.use(session({
-  store: new pgSession({ pool, tableName: 'session' }),
+  store: new pgSession({
+    pool: pool,
+    tableName: 'session',
+    createTableIfMissing: true   // auto-create table if missing
+  }),
   secret: process.env.SESSION_SECRET || 'campSecretKey',
   resave: false,
   saveUninitialized: false,
   cookie: {
-    secure: process.env.NODE_ENV === 'production', // ✅ HTTPS only in prod
-    httpOnly: true,
+    secure: process.env.NODE_ENV === process.env.NODE_ENV === 'production', // ✅ HTTPS only in prod
     sameSite: process.env.NODE_ENV === 'production' ? "none" : "lax", // ✅ allow cross-site cookies
     maxAge: 1000 * 60 * 60 * 24 * 7
   }
